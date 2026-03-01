@@ -1,4 +1,6 @@
+
 // adapter.js — v4.0
+// Файл: adapter.js | Глобальная версия: 5.0 (файл не изменялся с v4.0)
 // Исправления v4.0:
 // 1. КИМ-дисплей и кнопка темы больше не перекрываются (кнопка сдвинута)
 // 2. Пауза — полноэкранный оверлей с обратным отсчётом и кнопкой «Вернуться»
@@ -120,7 +122,6 @@
     }
 
     function startPauseOverlay() {
-        // БАГ 2 FIX: повторное нажатие — не запускаем второй таймер
         if (pauseActive) return;
         pauseActive = true;
 
@@ -169,7 +170,6 @@
     }
 
     // ─── ВЫЧИСЛЕНИЕ КИМ ДЛЯ РЕЖИМА ───────────────────────────────────────────
-    // БАГ 4 FIX: КИМ = нижняя_граница + (текущий_КИМ / 100) * ширина_диапазона
     function computeKIMForMode(mode) {
         const range   = MODE_RANGES[mode];
         const width   = range.max - range.min;
@@ -239,7 +239,6 @@
     }
 
     // ─── ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ ───────────────────────────────────────────────────
-    // БАГ 1 FIX: right:170px — не перекрывается с КИМ-дисплеем (right:20px, ~130px широкий)
     function initThemeToggle() {
         const btn = document.createElement('button');
         btn.id = 'echo-theme-toggle';
@@ -302,11 +301,6 @@
     }
 
     // ─── ЛОГИКА ВЕРСИЙ АБЗАЦЕВ ────────────────────────────────────────────────
-    // БАГ 3 FIX:
-    // Блоки ВЫШЕ нижней трети → фиксируем версию при первом попадании, не меняем
-    // Блоки НИЖЕ нижней трети → всегда в текущем режиме
-    // Исключение: scrollY < AT_TOP_THRESHOLD → сбрасываем все фиксации, весь текст в режиме
-
     function isAtTop() {
         return window.scrollY < AT_TOP_THRESHOLD;
     }
@@ -328,15 +322,11 @@
             const rect = block.getBoundingClientRect();
 
             if (rect.top < lowerBound) {
-                // Выше нижней трети: фиксируем при первом попадании
                 if (!blockFixed.has(block)) {
                     blockFixed.set(block, true);
-                    // При первой фиксации — ставим версию по текущему режиму
                     applyBlockVersion(block, showSimple);
                 }
-                // Уже зафиксирован — не трогаем
             } else {
-                // Ниже нижней трети: всегда в текущем режиме
                 blockFixed.delete(block);
                 applyBlockVersion(block, showSimple);
             }
@@ -360,15 +350,12 @@
             const rect = block.getBoundingClientRect();
 
             if (rect.top >= lowerBound) {
-                // Блок ниже нижней трети: обновляем по режиму, снимаем фиксацию
                 blockFixed.delete(block);
                 applyBlockVersion(block, showSimple);
             } else {
-                // Блок выше нижней трети: фиксируем если ещё не зафиксирован
                 if (!blockFixed.has(block)) {
                     blockFixed.set(block, true);
                 }
-                // Зафиксирован — не трогаем
             }
         });
     }
@@ -514,26 +501,23 @@
             textNodes.forEach(textNode => {
                 if (count >= max) return;
                 const text = textNode.nodeValue;
-                wordRe.lastIndex = 0;
-                if (!wordRe.test(text)) { wordRe.lastIndex = 0; return; }
-                wordRe.lastIndex = 0;
+                const matches = [...text.matchAll(wordRe)];
+                if (matches.length === 0) return;
+
+                const match = matches[0];
+                count++;
+
+                const before = text.slice(0, match.index);
+                const after  = text.slice(match.index + match[0].length);
+
+                const span = document.createElement('span');
+                span.className   = 'keyword';
+                span.textContent = match[0];
 
                 const frag = document.createDocumentFragment();
-                let lastIndex = 0, match;
-
-                while ((match = wordRe.exec(text)) !== null && count < max) {
-                    if (match.index > lastIndex)
-                        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-                    const span = document.createElement('span');
-                    span.className   = 'keyword';
-                    span.textContent = match[0];
-                    frag.appendChild(span);
-                    lastIndex = match.index + match[0].length;
-                    count++;
-                }
-
-                if (lastIndex < text.length)
-                    frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+                if (before) frag.appendChild(document.createTextNode(before));
+                frag.appendChild(span);
+                if (after) frag.appendChild(document.createTextNode(after));
 
                 textNode.parentNode.replaceChild(frag, textNode);
             });

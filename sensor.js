@@ -1,5 +1,6 @@
-// sensor.js – v3.1
-// Изменение v3.1: версия синхронизирована с adapter.js v4.0.
+// sensor.js — v5.1
+// Файл: sensor.js | Глобальная версия: 5.0
+// Изменение v5.1: добавлен вызов EchoStorage.saveKIM() при каждом пересчёте КИМ.
 // Логика КИМ без изменений. window.applyAdaptation вызывается без fromManual.
 
 (function () {
@@ -61,7 +62,7 @@
         const pause = Date.now() - enterTime;
         mouseEnterTimes.delete(el);
 
-        if (pause > 800)                    clickScore = clamp(clickScore - 3, 0, 100);
+        if (pause > 800)                       clickScore = clamp(clickScore - 3, 0, 100);
         else if (pause >= 200 && pause <= 500) clickScore = clamp(clickScore + 1, 0, 100);
     });
 
@@ -84,7 +85,7 @@
                 timeAtBottom = null;
             }
 
-            const delta = oldest.y - window.scrollY;
+            const delta      = oldest.y - window.scrollY;
             const longEnough = timeAtBottom && (now - timeAtBottom >= 3000);
             if (delta > 300 && longEnough) {
                 returnScore  = clamp(returnScore - 5, 0, 100);
@@ -118,12 +119,19 @@
             ` | chrono:${getChronoBonus()} → КИМ:${smoothedKIM}`
         );
 
+        // ─── v5.1: Сохраняем КИМ в localStorage через EchoStorage ───────────
+        // Guard: EchoStorage может отсутствовать если storage.js не загружен
+        if (window.EchoStorage) {
+            window.EchoStorage.saveKIM(smoothedKIM, Date.now());
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         const zoneChanged = lastKIM === null || getZone(smoothedKIM) !== getZone(lastKIM);
         const bigDelta    = lastKIM !== null && Math.abs(smoothedKIM - lastKIM) >= KIM_CHANGE_THRESHOLD;
 
         // Вызываем без fromManual — adapter сам решит, применять или нет
         if ((zoneChanged || bigDelta) && window.applyAdaptation) {
-            window.applyAdaptation(smoothedKIM); // fromManual не передаём
+            window.applyAdaptation(smoothedKIM);
         }
 
         lastKIM = smoothedKIM;

@@ -1,3 +1,9 @@
+<!-- index.html — v5.0 | Глобальная версия: 5.0 -->
+<!-- Изменения v5.0:
+     - Подключён storage.js (перед sensor.js)
+     - Добавлена ссылка-иконка #dash-link на dashboard.html
+     - Убран дублирующий #pause-btn (управляется только adapter.js)
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -11,8 +17,8 @@
 
     <div id="kim-display">КИМ: —</div>
 
-    <!-- Кнопка паузы: display управляется только через adapter.js -->
-    <button id="pause-btn">☕ Сделай паузу 5 минут</button>
+    <!-- Ссылка на хронокогнитивный дашборд (v5.0) -->
+    <a id="dash-link" href="dashboard.html" title="Твой когнитивный профиль">📊</a>
 
     <div class="article">
         <main>
@@ -92,7 +98,11 @@
         </main>
     </div>
 
-    <!-- sensor.js ПЕРЕД adapter.js — порядок важен -->
+    <!-- Порядок подключения скриптов критичен: -->
+    <!-- 1. storage.js  — должен быть ДО sensor.js (EchoStorage нужен при первом updateKIM) -->
+    <!-- 2. sensor.js   — считает КИМ, вызывает EchoStorage.saveKIM и applyAdaptation     -->
+    <!-- 3. adapter.js  — меняет режим отображения; должен быть ПОСЛЕ sensor.js            -->
+    <script src="storage.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
 </body>
