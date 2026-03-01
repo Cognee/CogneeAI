@@ -1,0 +1,385 @@
+/* ═══════════════════════════════════════════════════════════
+   ЭхоСреда — styles v4.0
+   Изменения v4.0:
+   - Добавлены стили полноэкранного оверлея паузы (#pause-overlay)
+   - Добавлены стили кнопки-триггера паузы (#pause-trigger-btn)
+   - Удалены стили старой кнопки #pause-btn (.counting)
+   - Остальное без изменений
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── CSS-ПЕРЕМЕННЫЕ: ТЁМНАЯ ТЕМА (по умолчанию) ─────────────────────────── */
+:root {
+    --bg:            #0f0f0f;
+    --bg-normal:     #111318;
+    --bg-tired:      #12100e;
+    --text:          #e8e0d0;
+    --text-normal:   #ddd8c8;
+    --text-tired:    #c4b89e;
+    --h2-focus:      #4FC3F7;
+    --h2-normal:     #81C784;
+    --h2-tired:      #c49a6c;
+    --h2-border-f:   #4FC3F722;
+    --h2-border-n:   #81C78422;
+    --h2-border-t:   #c49a6c22;
+    --kim-bg:        #0a1020;
+    --kim-color:     #a0b8d0;
+    --keyword-bg:    rgba(255,253,231,0.12);
+    --keyword-color: #FFE082;
+    --keyword-box:   rgba(255,224,130,0.2);
+    --active-glow:   rgba(196,154,108,0.18);
+}
+
+/* ─── CSS-ПЕРЕМЕННЫЕ: СВЕТЛАЯ ТЕМА ───────────────────────────────────────── */
+[data-theme="light"] {
+    --bg:            #f5f0e8;
+    --bg-normal:     #eeeae0;
+    --bg-tired:      #f0ebe0;
+    --text:          #2a2520;
+    --text-normal:   #342e28;
+    --text-tired:    #5c4f3d;
+    --h2-focus:      #1a7ab5;
+    --h2-normal:     #2e7d32;
+    --h2-tired:      #8b5e3c;
+    --h2-border-f:   #1a7ab522;
+    --h2-border-n:   #2e7d3222;
+    --h2-border-t:   #8b5e3c22;
+    --kim-bg:        #ddd8ce;
+    --kim-color:     #4a3f35;
+    --keyword-bg:    rgba(139,94,60,0.12);
+    --keyword-color: #7a4820;
+    --keyword-box:   rgba(139,94,60,0.2);
+    --active-glow:   rgba(139,94,60,0.12);
+}
+
+/* ─── БАЗОВЫЕ СТИЛИ ──────────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0 0 140px;
+    transition:
+        font-size        1.5s ease,
+        line-height      1.5s ease,
+        background-color 1.2s ease,
+        color            1.2s ease;
+}
+
+.article {
+    max-width: 700px;
+    margin: 60px auto;
+    padding: 0 24px;
+}
+
+/* ─── РЕЖИМ FOCUS (КИМ > 70) ─────────────────────────────────────────────── */
+body.mode-focus {
+    font-size: 16px;
+    line-height: 1.65;
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+body.mode-focus p {
+    opacity: 1;
+    margin-bottom: 18px;
+    transition: opacity 1.5s ease;
+}
+
+body.mode-focus .keyword {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: inherit;
+}
+
+body.mode-focus h2 {
+    font-size: 20px;
+    color: var(--h2-focus);
+    border-bottom: 1px solid var(--h2-border-f);
+    padding-bottom: 8px;
+    margin: 40px 0 16px;
+}
+
+/* ─── РЕЖИМ NORMAL (КИМ 40–70) ───────────────────────────────────────────── */
+body.mode-normal {
+    font-size: 17px;
+    line-height: 1.85;
+    background-color: var(--bg-normal);
+    color: var(--text-normal);
+}
+
+body.mode-normal p {
+    opacity: 1;
+    margin-bottom: 22px;
+    transition: opacity 1.5s ease;
+}
+
+body.mode-normal .keyword {
+    background: var(--keyword-bg);
+    color: var(--keyword-color);
+    padding: 1px 5px;
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--keyword-box);
+}
+
+body.mode-normal h2 {
+    font-size: 20px;
+    color: var(--h2-normal);
+    border-bottom: 1px solid var(--h2-border-n);
+    padding-bottom: 8px;
+    margin: 40px 0 16px;
+}
+
+/* ─── РЕЖИМ TIRED (КИМ < 40) — тёплая расслабляющая гамма ───────────────── */
+body.mode-tired {
+    font-size: 20px;
+    line-height: 2.15;
+    background-color: var(--bg-tired);
+    color: var(--text-tired);
+}
+
+/* Тёмная тема tired: тёплый янтарно-сепийный фон */
+body.mode-tired {
+    background-color: #13110e;
+}
+
+[data-theme="light"].mode-tired,
+[data-theme="light"] body.mode-tired {
+    background-color: #f0e8d8;
+}
+
+body.mode-tired p {
+    opacity: 0.1;
+    margin-bottom: 28px;
+    transition: opacity 1.2s ease;
+}
+
+body.mode-tired p.active-para {
+    opacity: 1;
+    /* Мягкое тёплое свечение вокруг активного абзаца */
+    background: var(--active-glow);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 0 -16px 28px;
+    box-shadow: 0 0 40px var(--active-glow);
+}
+
+body.mode-tired h2 {
+    font-size: 22px;
+    color: var(--h2-tired);
+    border-bottom: 1px solid var(--h2-border-t);
+    padding-bottom: 8px;
+    margin: 48px 0 20px;
+    opacity: 0.5;
+    transition: opacity 1.2s ease;
+}
+
+/* ─── ПАРАГРАФЫ С ДВУМЯ ВЕРСИЯМИ ─────────────────────────────────────────── */
+.para-full,
+.para-simple {
+    margin: 0 0 18px;
+}
+
+/* ─── КНОПКА-ТРИГГЕР ПАУЗЫ ───────────────────────────────────────────────── */
+/* display управляется ТОЛЬКО через JS */
+#pause-trigger-btn {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #c47a45, #a05a28);
+    color: #fff8f0;
+    font-size: 15px;
+    font-weight: bold;
+    font-family: Georgia, serif;
+    padding: 14px 32px;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow:
+        0 4px 24px rgba(180,100,40,0.45),
+        0 0 50px rgba(160,80,30,0.2);
+    transition:
+        background   0.2s ease,
+        transform    0.15s ease,
+        box-shadow   0.2s ease;
+    z-index: 10002;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+#pause-trigger-btn:hover {
+    background: linear-gradient(135deg, #a05a28, #804020);
+    transform: translateX(-50%) scale(1.04);
+    box-shadow:
+        0 6px 32px rgba(160,80,30,0.55),
+        0 0 60px rgba(160,80,30,0.25);
+}
+
+#pause-trigger-btn:active {
+    transform: translateX(-50%) scale(0.97);
+}
+
+/* ─── ПОЛНОЭКРАННЫЙ ОВЕРЛЕЙ ПАУЗЫ ────────────────────────────────────────── */
+#pause-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, #2a1a0a 0%, #0f0a05 100%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+#pause-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+[data-theme="light"] #pause-overlay {
+    background: radial-gradient(ellipse at center, #f5e8d0 0%, #e8d5b0 100%);
+}
+
+.pause-overlay-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+    padding: 40px;
+    max-width: 480px;
+}
+
+.pause-overlay-emoji {
+    font-size: 64px;
+    line-height: 1;
+    filter: drop-shadow(0 0 30px rgba(220,140,60,0.6));
+    animation: pause-float 3s ease-in-out infinite;
+}
+
+@keyframes pause-float {
+    0%, 100% { transform: translateY(0);    }
+    50%       { transform: translateY(-8px); }
+}
+
+.pause-overlay-title {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: #f0d8b0;
+    letter-spacing: 0.04em;
+}
+
+[data-theme="light"] .pause-overlay-title {
+    color: #6b3a10;
+}
+
+.pause-overlay-countdown {
+    font-family: 'Courier New', monospace;
+    font-size: 72px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #e8a060;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(232,160,96,0.5);
+    letter-spacing: 0.06em;
+}
+
+[data-theme="light"] .pause-overlay-countdown {
+    color: #a05020;
+    text-shadow: 0 0 30px rgba(160,80,32,0.3);
+}
+
+.pause-overlay-subtitle {
+    font-family: Georgia, serif;
+    font-size: 16px;
+    color: #a07850;
+    font-style: italic;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+}
+
+[data-theme="light"] .pause-overlay-subtitle {
+    color: #7a5030;
+}
+
+.pause-overlay-return {
+    margin-top: 16px;
+    background: transparent;
+    color: #c47a45;
+    border: 1px solid #c47a4566;
+    border-radius: 30px;
+    padding: 12px 28px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.pause-overlay-return:hover {
+    background: rgba(196,122,69,0.15);
+    border-color: #c47a45aa;
+    transform: scale(1.03);
+}
+
+.pause-overlay-return:active {
+    transform: scale(0.97);
+}
+
+[data-theme="light"] .pause-overlay-return {
+    color: #8b4010;
+    border-color: #8b401066;
+}
+
+[data-theme="light"] .pause-overlay-return:hover {
+    background: rgba(139,64,16,0.1);
+    border-color: #8b4010aa;
+}
+
+/* ─── КИМ-ДИСПЛЕЙ ────────────────────────────────────────────────────────── */
+#kim-display {
+    background-color: var(--kim-bg);
+    color: var(--kim-color);
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border-left: 3px solid #4FC3F7;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    letter-spacing: 0.06em;
+    box-shadow:
+        0 2px 16px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+    transition: border-color 1s ease, background-color 1.2s ease, color 1.2s ease;
+}
+
+/* ─── КНОПКА ТЕМЫ ────────────────────────────────────────────────────────── */
+#echo-theme-toggle:hover {
+    background: rgba(255,255,255,0.1) !important;
+}
+
+[data-theme="light"] #echo-theme-toggle {
+    color: #4a3f35 !important;
+    border-color: rgba(0,0,0,0.2) !important;
+}
+
+[data-theme="light"] #echo-theme-toggle:hover {
+    background: rgba(0,0,0,0.08) !important;
+}
+
+/* ─── СВЕТЛАЯ ТЕМА: переопределение Kim-display ──────────────────────────── */
+[data-theme="light"] #kim-display {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+}
