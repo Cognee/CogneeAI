@@ -1,5 +1,5 @@
-// sensor.js — v7.0
-// Файл: sensor.js | Глобальная версия: 7.0
+// sensor.js — v7.1
+// Файл: sensor.js | Глобальная версия: 7.1
 // Изменения v7.0 (инференс на чистом JS — без TF.js):
 //   - Веса SimpleRNN встроены прямо в файл — никаких внешних загрузок
 //   - TF.js полностью удалён из логики инференса
@@ -163,11 +163,11 @@
             h = h.map((v, i) => (v - W.bn_mean[i]) / Math.sqrt(W.bn_var[i] + eps) * W.bn_gamma[i] + W.bn_beta[i]);
 
             // 3. Dense(24) + ReLU
-            let d1 = addvec(matvec(W.d1_W, h), W.d1_b);
+            let d1 = addvec(dot(W.d1_W, h), W.d1_b);
             d1 = d1.map(v => Math.max(0, v));
 
             // 4. Dense(5) + Softmax
-            let logits = addvec(matvec(W.d2_W, d1), W.d2_b);
+            let logits = addvec(dot(W.d2_W, d1), W.d2_b);
             const maxL = Math.max(...logits);
             const exps = logits.map(v => Math.exp(v - maxL));
             const sumE = exps.reduce((s, v) => s + v, 0);
