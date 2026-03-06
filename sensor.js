@@ -1,10 +1,12 @@
-// sensor.js — v6.3
-// Файл: sensor.js | Глобальная версия: 6.3
-// Изменения v6.3 (фикс AbortSignal + postMessage баг TF.js):
-//   - Убран AbortController из fetch: TF.js использует Web Workers с postMessage,
-//     которые не умеют клонировать AbortSignal → падало с "could not be cloned"
-//   - modelFileExists() теперь чистый fetch без signal — таймаут через Promise.race
-//   - Логика таймаутов сохранена через withTimeout() без AbortController
+// sensor.js — v6.4
+// Файл: sensor.js | Глобальная версия: 6.4
+// Изменения v6.4 (фикс таймаута на GitHub Pages CDN):
+//   - Убрана предварительная проверка modelFileExists(): GitHub Pages CDN "холодный старт"
+//     может занимать 20+ сек → fetch висел и падал по таймауту 5 сек
+//   - tryLoadModel() теперь сразу вызывает tf.loadLayersModel() без лишнего fetch
+//   - TF.js сам обрабатывает 404 и сетевые ошибки — catch ловит всё
+//   - Таймаут загрузки увеличен до 60 сек (CDN + weights.bin)
+//   - Бейдж "загрузка" показывается сразу, без ожидания проверки
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -217,28 +219,6 @@
     // ─── ЗАГРУЗКА МОДЕЛИ ──────────────────────────────────────────────────────
 
     // Вспомогательная: проверяем доступность model.json через GET (не HEAD — GitHub Pages блокирует HEAD)
-    // Без AbortController: TF.js использует Web Workers с postMessage,
-    // которые не умеют клонировать AbortSignal → "could not be cloned"
-    // Таймаут реализован через withTimeout + Promise.race
-    async function modelFileExists() {
-        const absoluteURL = new URL(MODEL_PATH, window.location.href).href;
-        console.log('[ЭхоСреда] Проверяю:', absoluteURL);
-        try {
-            const res = await withTimeout(
-                fetch(absoluteURL, { method: 'GET', mode: 'cors' }),
-                5000,
-                'modelFileExists'
-            );
-            if (!res.ok) {
-                console.log('[ЭхоСреда] Сервер ответил', res.status);
-            }
-            return res.ok;
-        } catch (err) {
-            console.log('[ЭхоСреда] Проверка модели не удалась:', err.message);
-            return false;
-        }
-    }
-
     // Вспомогательная: Promise с таймаутом
     function withTimeout(promise, ms, label) {
         const timeout = new Promise((_, reject) =>
@@ -259,26 +239,22 @@
 
         console.log('[ЭхоСреда] TensorFlow.js v' + window.tf.version.tfjs);
 
-        // ── ШАГ 1: GET-проверка — доступен ли model.json? ────────────────────
-        const exists = await modelFileExists();
-
-        if (!exists) {
-            console.log('[ЭхоСреда] ⚠ model/model.json недоступен → эвристика');
-            console.log('[ЭхоСреда] Убедись что model/ и group1-shard1of1.bin залиты на GitHub');
-            updateNeuralBadge('fallback');
-            return;
-        }
-
-        // ── ШАГ 2: загружаем модель (таймаут 15 сек — weights.bin может быть большим) ──
+        // Сразу показываем бейдж и грузим модель — без предварительного fetch-пинга.
+        // GitHub Pages CDN может долго "просыпаться" на первом запросе,
+        // поэтому лишний fetch только добавлял задержку и ложные таймауты.
+        // TF.js сам бросит исключение при 404 или сетевой ошибке.
         updateNeuralBadge('loading');
-        console.log('[ЭхоСреда] Загружаю нейросеть...');
+
+        const absoluteURL = new URL(MODEL_PATH, window.location.href).href;
+        console.log('[ЭхоСреда] Загружаю нейросеть:', absoluteURL);
 
         try {
             const t0 = performance.now();
 
+            // Таймаут 60 сек: CDN "холодный старт" + скачивание weights.bin
             tfModel = await withTimeout(
-                window.tf.loadLayersModel(MODEL_PATH),
-                15000,
+                window.tf.loadLayersModel(absoluteURL),
+                60000,
                 'tf.loadLayersModel'
             );
 
@@ -301,7 +277,7 @@
         } catch (err) {
             tfModel          = null;
             modelLoadSuccess = false;
-            console.warn('[ЭхоСреда] Ошибка/таймаут загрузки модели:', err.message, '→ эвристика');
+            console.warn('[ЭхоСреда] Ошибка загрузки модели:', err.message, '→ эвристика');
             updateNeuralBadge('fallback');
         }
     }
