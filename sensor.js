@@ -1,11 +1,11 @@
-// sensor.js — v6.1
-// Файл: sensor.js | Глобальная версия: 6.1
-// Изменения v6.1 (фикс зависания бейджа «загрузка»):
-//   - Добавлен предварительный fetch-ping: проверяем существование model.json ДО tf.loadLayersModel
-//   - Promise.race с таймаутом 8 сек: если TF.js завис — автоматический fallback
-//   - Бейдж «загрузка» больше не висит вечно ни на file://, ни на GitHub Pages
-//   - Если папка model/ не залита на GitHub — сразу переключается на эвристику
-//   - Исправлено: catch теперь ловит все типы ошибок (не только сообщения с '404')
+// sensor.js — v6.2
+// Файл: sensor.js | Глобальная версия: 6.2
+// Изменения v6.2 (фикс загрузки модели на GitHub Pages):
+//   - Убран HEAD-запрос: GitHub Pages блокирует HEAD с cache:no-store → возвращал false даже при наличии файла
+//   - modelFileExists() заменён на GET-запрос с mode:'cors' — корректно работает на GitHub Pages
+//   - Таймаут проверки увеличен до 5 сек (GitHub Pages иногда медленно отдаёт первый запрос)
+//   - Таймаут загрузки модели увеличен до 15 сек (weights.bin может быть большим)
+//   - Добавлен лог URL который реально запрашивается — для диагностики путей
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -217,20 +217,30 @@
 
     // ─── ЗАГРУЗКА МОДЕЛИ ──────────────────────────────────────────────────────
 
-    // Вспомогательная: проверяем, доступен ли model.json (fetch ping, таймаут 3 сек)
+    // Вспомогательная: проверяем доступность model.json через GET (не HEAD — GitHub Pages блокирует HEAD)
     async function modelFileExists() {
         try {
             const controller = new AbortController();
-            const timeoutId  = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(MODEL_PATH, {
-                method: 'HEAD',
+            const timeoutId  = setTimeout(() => controller.abort(), 5000);
+
+            // Строим абсолютный URL для диагностики в консоли
+            const absoluteURL = new URL(MODEL_PATH, window.location.href).href;
+            console.log('[ЭхоСреда] Проверяю:', absoluteURL);
+
+            const res = await fetch(absoluteURL, {
+                method: 'GET',
+                mode:   'cors',
                 signal: controller.signal,
-                cache:  'no-store',
             });
             clearTimeout(timeoutId);
-            return res.ok; // true = файл есть, false = 404 и т.п.
-        } catch {
-            // fetch упал (file://, abort, сеть) — считаем что файла нет
+
+            if (!res.ok) {
+                console.log('[ЭхоСреда] Сервер ответил', res.status, 'для', absoluteURL);
+            }
+            return res.ok;
+        } catch (err) {
+            // file://, abort, CORS, сеть — считаем что файла нет
+            console.log('[ЭхоСреда] fetch упал:', err.message);
             return false;
         }
     }
@@ -255,30 +265,26 @@
 
         console.log('[ЭхоСреда] TensorFlow.js v' + window.tf.version.tfjs);
 
-        // ── ШАГ 1: ping — существует ли model.json? ──────────────────────────
-        console.log('[ЭхоСреда] Проверяю наличие', MODEL_PATH, '...');
+        // ── ШАГ 1: GET-проверка — доступен ли model.json? ────────────────────
         const exists = await modelFileExists();
 
         if (!exists) {
-            console.log('[ЭхоСреда] ⚠ model/model.json не найден → эвристика');
-            console.log('[ЭхоСреда] Чтобы активировать нейросеть:');
-            console.log('[ЭхоСреда]   1. Обучи модель в Colab (Промт 4)');
-            console.log('[ЭхоСреда]   2. Скопируй папку echo_model/ → model/ в проект');
-            console.log('[ЭхоСреда]   3. Залей папку model/ на GitHub вместе с остальными файлами');
+            console.log('[ЭхоСреда] ⚠ model/model.json недоступен → эвристика');
+            console.log('[ЭхоСреда] Убедись что model/ и group1-shard1of1.bin залиты на GitHub');
             updateNeuralBadge('fallback');
             return;
         }
 
-        // ── ШАГ 2: загружаем модель (таймаут 8 сек) ──────────────────────────
+        // ── ШАГ 2: загружаем модель (таймаут 15 сек — weights.bin может быть большим) ──
         updateNeuralBadge('loading');
-        console.log('[ЭхоСреда] Загружаю нейросеть из', MODEL_PATH, '...');
+        console.log('[ЭхоСреда] Загружаю нейросеть...');
 
         try {
             const t0 = performance.now();
 
             tfModel = await withTimeout(
                 window.tf.loadLayersModel(MODEL_PATH),
-                8000,
+                15000,
                 'tf.loadLayersModel'
             );
 
