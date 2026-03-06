@@ -1,10 +1,10 @@
-// sensor.js — v6.7
-// Файл: sensor.js | Глобальная версия: 6.7
-// Изменения v6.7 (переход на graph model):
-//   - Модель переконвертирована в tfjs_graph_model (SimpleRNN вместо LSTM — нет CudnnRNNV3)
-//   - Загрузка через tf.loadGraphModel напрямую — без попытки loadLayersModel
-//   - predict() для graph model возвращает тензор напрямую, не массив
-//   - Убрана двухшаговая логика загрузки — только loadGraphModel
+// sensor.js — v6.8
+// Файл: sensor.js | Глобальная версия: 6.8
+// Изменения v6.8 (убран принудительный CPU бэкенд):
+//   - tf.setBackend(cpu) удалён: graph model требует WebGL для ряда операций
+//     даже в CPU режиме — это и вызывало зависание
+//   - TF.js теперь сам выбирает оптимальный бэкенд (webgl → cpu → wasm)
+//   - Добавлен tf.ready() без указания бэкенда — ждём инициализации
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -250,12 +250,12 @@
         try {
             const t0 = performance.now();
 
-            await window.tf.setBackend('cpu');
+            // Ждём инициализации TF.js без указания бэкенда —
+            // пусть сам выберет webgl → wasm → cpu
             await window.tf.ready();
             console.log('[ЭхоСреда] Бэкенд:', window.tf.getBackend());
 
-            // Graph model — конвертирована через tensorflowjs_converter из SavedModel
-            // SimpleRNN вместо LSTM: нет CudnnRNNV3, полная совместимость с браузером
+            // Graph model — SimpleRNN, без CudnnRNNV3, совместима с браузером
             console.log('[ЭхоСреда] Загружаю graph model...');
             tfModel = await window.tf.loadGraphModel(absoluteURL);
             console.log('[ЭхоСреда] loadGraphModel OK');
