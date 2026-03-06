@@ -1,21 +1,308 @@
-<!-- index.html — v5.0 | Глобальная версия: 5.0 -->
-<!-- Изменения v5.0:
-     - Подключён storage.js (перед sensor.js)
-     - Добавлена ссылка-иконка #dash-link на dashboard.html
-     - Убран дублирующий #pause-btn (управляется только adapter.js)
--->
-<!DOCTYPE html>
-<html lang="ru">
-<head>
+<!-- index.html — v6.0 | Глобальная версия: 6.0 --><!-- Изменения v6.0 (Недели 5-6: TensorFlow.js в браузере):
+     - Обновлён заголовок title и мета-описание
+     - Добавлена подсказка в kim-display о режиме (🧠 / ⚙)
+     - Обновлён порядок и комментарии к скриптам для v6.0
+     - TF.js подключён явно как основная зависимость
+     - Готов к подключению analytics.js (v7.1) одной строкой
+--><!DOCTYPE html><html lang="ru"><head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.13/html-to-image.min.js" integrity="sha512-iZ2ORl595Wx6miw+GuadDet4WQbdSWS3JLMoNfY8cRGoEFy6oT3G9IbcrBeL6AfkgpA51ETt/faX6yLV+/gFJg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      (function() {
+        const originalConsole = window.console;
+        window.console = {
+          log: (...args) => {
+            originalConsole.log(...args);
+            window.parent.postMessage({ type: 'console', message: args.join(' ') }, '*');
+          },
+          error: (...args) => {
+            originalConsole.error(...args);
+            window.parent.postMessage({ type: 'console', message: 'Error: ' + args.join(' ') }, '*');
+          },
+          warn: (...args) => {
+            originalConsole.warn(...args);
+            window.parent.postMessage({ type: 'console', message: 'Warning: ' + args.join(' ') }, '*');
+          }
+        };
+
+        let requestId = 0;
+        let callbacksMap = new Map();
+        let streamControllers = new Map();
+        
+        window.claude = {
+          complete: (prompt) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage({ type: 'claudeComplete', id, prompt }, '*');
+            });
+          }
+        };
+
+        window.storage = {
+          get: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage({ type: 'storageGet', id, key, shared }, '*');
+            });
+          },
+          set: (key, value, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage({ type: 'storageSet', id, key, value, shared }, '*');
+            });
+          },
+          delete: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage({ type: 'storageDelete', id, key, shared }, '*');
+            });
+          },
+          list: (prefix, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = requestId++;
+              callbacksMap.set(id, { resolve, reject });
+              window.parent.postMessage({ type: 'storageList', id, prefix, shared }, '*');
+            });
+          }
+        };
+
+        let pendingBlobs = new Map();
+        URL.createObjectURL = (blob) => {
+          // Store the blob and create an ID and URL for it
+          const blobId = `blob-${Date.now()}-${Math.random()}`;
+          pendingBlobs.set(blobId, blob);
+          return `blob-request://${blobId}`;
+        };
+
+        URL.revokeObjectURL = (url) => {
+          // Remove the blob from our store
+          const blobId = url.replace("blob-request://", "");
+          pendingBlobs.delete(blobId);
+        };
+
+        const getBlobFromURL = (url) => {
+          const blobId = url.replace("blob-request://", "");
+          return pendingBlobs.get(blobId);
+        };
+
+        // Override global fetch with streaming support
+        window.fetch = (url, init = {}) => {
+          return new Promise((resolve, reject) => {
+            const id = requestId++;
+            const channelId = `fetch-${id}-${Date.now()}`;
+            
+            callbacksMap.set(id, { 
+              resolve: (response) => {
+                // Create a ReadableStream for the response body
+                const stream = new ReadableStream({
+                  start(controller) {
+                    streamControllers.set(channelId, controller);
+                  },
+                  cancel() {
+                    streamControllers.delete(channelId);
+                  }
+                });
+                
+                // Create and return the Response with the stream
+                resolve(new Response(stream, {
+                  status: response.status,
+                  statusText: response.statusText,
+                  headers: response.headers
+                }));
+              },
+              reject,
+              channelId
+            });
+            
+            window.parent.postMessage({
+              type: 'proxyFetch',
+              id,
+              url,
+              init,
+              channelId
+            }, '*');
+          });
+        };
+
+        window.addEventListener('message', async (event) => {
+          if (event.data.type === 'takeScreenshot') {
+            const rootElement = document.getElementById('artifacts-component-root-html');
+            if (!rootElement) {
+              window.parent.postMessage({
+                type: 'screenshotError',
+                error: new Error('Root element not found'),
+              }, '*');
+            }
+            const screenshot = await htmlToImage.toPng(rootElement, {
+              imagePlaceholder:
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjePDgwX8ACOQDoNsk0PMAAAAASUVORK5CYII=",
+            });
+            window.parent.postMessage({
+              type: 'screenshotData',
+              data: screenshot,
+            }, '*');
+          } else if (event.data.type === 'claudeComplete') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.completion);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'proxyFetchResponse') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+              callbacksMap.delete(event.data.id);
+            } else {
+              // Initial response with headers, status, etc.
+              callback.resolve({
+                status: event.data.status,
+                statusText: event.data.statusText,
+                headers: event.data.headers
+              });
+              // Don't delete the callback yet if streaming
+              if (!event.data.body) {
+                callbacksMap.delete(event.data.id);
+              }
+            }
+          } else if (event.data.type === 'proxyFetchStream') {
+            // Handle streaming data chunks
+            const controller = streamControllers.get(event.data.channelId);
+            if (controller) {
+              if (event.data.error) {
+                controller.error(new Error(event.data.error));
+                streamControllers.delete(event.data.channelId);
+              } else if (event.data.done) {
+                controller.close();
+                streamControllers.delete(event.data.channelId);
+                // Clean up the callback
+                const callback = Array.from(callbacksMap.entries()).find(
+                  ([_, value]) => value.channelId === event.data.channelId
+                );
+                if (callback) {
+                  callbacksMap.delete(callback[0]);
+                }
+              } else if (event.data.chunk) {
+                controller.enqueue(new Uint8Array(event.data.chunk));
+              }
+            }
+          } else if (event.data.type === 'storageGet') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageSet') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageDelete') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageList') {
+            const callback = callbacksMap.get(event.data.id);
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          }
+        });
+
+        window.addEventListener('click', (event) => {
+          const isEl = event.target instanceof HTMLElement;
+          if (!isEl) return;
+    
+          // find ancestor links
+          const linkEl = event.target.closest("a");
+          if (!linkEl || !linkEl.href) return;
+    
+          event.preventDefault();
+          event.stopImmediatePropagation();
+    
+          if (linkEl.href.startsWith("blob-request:")) {
+            const blob = getBlobFromURL(linkEl.href);
+            if (!blob) return;
+            void blob.arrayBuffer().then((data) => {
+              window.parent.postMessage({
+                type: "downloadFile",
+                filename: linkEl.download,
+                data,
+                mimeType: blob.type || "application/octet-stream",
+              });
+            });
+          } else if (linkEl.href.startsWith("data:")) {
+            const [header, base64Data] = linkEl.href.split(",");
+            const mimeMatch = header.match(/data:([^;]+)/);
+            const mimeType = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+            const binaryString = atob(base64Data);
+            const data = Uint8Array.from(binaryString, (c) =>
+              c.charCodeAt(0),
+            ).buffer;
+            window.parent.postMessage({
+              type: "downloadFile",
+              filename: linkEl.download,
+              data,
+              mimeType,
+            });
+          } else {
+            let linkUrl;
+            try {
+              linkUrl = new URL(linkEl.href);
+            } catch (error) {
+              return;
+            }
+    
+            if (linkUrl.hostname === window.location.hostname) return;
+      
+            window.parent.postMessage({
+              type: 'openExternal',
+              href: linkEl.href,
+            }, '*');
+          }
+      });
+
+        const originalOpen = window.open;
+        window.open = function (url) {
+          window.parent.postMessage({
+            type: "openExternal",
+            href: url,
+          }, "*");
+        };
+
+        window.addEventListener('error', (event) => {
+          window.parent.postMessage({ type: 'console', message: 'Uncaught Error: ' + event.message }, '*');
+        });
+      })();
+    </script>
+  
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ЭхоСреда — демо</title>
+    <meta name="description" content="ЭхоСреда — адаптивная подача контента по поведению пользователя. Нейросеть в браузере.">
+    <title>ЭхоСреда — демо v6.0</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <!-- data-theme="dark" по умолчанию; adapter.js переключает на "light" -->
-<body class="mode-focus" data-theme="dark">
+<body class="mode-focus" data-theme="dark" id="artifacts-component-root-html">
 
-    <div id="kim-display">КИМ: —</div>
+    <!-- КИМ-дисплей: 🧠 — нейросеть активна, ⚙ — эвристика (нет model/) -->
+    <div id="kim-display" title="Когнитивный Индекс Момента. 🧠 = нейросеть, ⚙ = эвристика">КИМ: —</div>
 
     <!-- Ссылка на хронокогнитивный дашборд (v5.0) -->
     <a id="dash-link" href="dashboard.html" title="Твой когнитивный профиль">📊</a>
@@ -27,63 +314,39 @@
 
             <div class="para-block">
                 <p class="para-full">Представьте себе огромную паутину, которая опутывает всю планету. Только вместо пауков в ней живут компьютеры, смартфоны и серверы, а вместо нитей — километры оптоволоконных кабелей, проложенных по дну океанов и спрятанных под землей. Интернет — это не "облако" в небе, а физическая инфраструктура: миллионы устройств, соединённых друг с другом проводами, Wi-Fi роутерами и вышками сотовой связи. Когда вы отправляете сообщение в мессенджере, оно разбивается на маленькие пакеты, которые путешествуют по этому лабиринту, на ходу выбирая самый быстрый маршрут, словно опытный курьер в незнакомом городе.</p>
-                <p class="para-simple" style="display:none">Интернет — это просто множество компьютеров по всему миру, соединённых проводами и беспроводными сетями, чтобы обмениваться информацией.</p>
+                <p class="para-simple" style="display:none">Интернет — это миллионы компьютеров, соединённых кабелями по всей планете. Ваши сообщения разбиваются на части и идут к адресату по самому быстрому пути.</p>
             </div>
 
             <div class="para-block">
-                <p class="para-full">Секрет интернета в том, что он децентрализован. У него нет одного "главного пульта управления" или "красной кнопки", которую можно нажать и всё выключить. Информация передаётся по принципу "каждый с каждым": если один кабель повредить (например, экскаватором на стройке), данные просто пойдут в обход — по другому маршруту. Именно за это свойство интернет сравнивают с паутиной: оборви одну нить, паук (то есть данные) всё равно доберётся до цели по соседним ниточкам.</p>
-                <p class="para-simple" style="display:none">Сеть устроена так хитро, что если один провод сломается, информация всё равно найдёт другой путь к получателю, как вода в реке обходит камни.</p>
+                <p class="para-full">Но как все эти устройства понимают друг друга? Ответ — в протоколах. Представьте, что вы приехали в страну, где говорят на другом языке, но у вас есть универсальный переводчик. В мире компьютеров таким переводчиком служит набор правил — протокол TCP/IP. Каждое устройство в интернете имеет уникальный адрес — IP-адрес, похожий на почтовый индекс. Благодаря ему пакеты данных точно знают, куда им нужно доставиться, даже если маршрут пролегает через десятки промежуточных узлов на разных континентах.</p>
+                <p class="para-simple" style="display:none">Все устройства общаются по единым правилам — протоколу TCP/IP. У каждого есть уникальный адрес (IP), как номер квартиры, чтобы данные нашли нужный компьютер.</p>
             </div>
 
-            <h2>Раздел 2: IP-адреса</h2>
+            <h2>Раздел 2: Как работает браузер</h2>
 
             <div class="para-block">
-                <p class="para-full">Чтобы десятки миллиардов устройств не перепутали друг друга в этой глобальной сети, каждому из них выдаётся уникальный идентификатор — IP-адрес. Это как номер квартиры в огромном почтовом отделении мира. Раньше адреса выглядели как 192.168.0.1 (это старая версия — IPv4), но квартир стало так много, что адресов перестало хватать. Поэтому сейчас внедряют новую версию — IPv6, например, 2001:0db8:85a3:0000:0000:8a2e:0370:7334. Таких адресов хватит, чтобы присвоить свой личный адрес каждому атому на поверхности Земли.</p>
-                <p class="para-simple" style="display:none">У каждого компьютера или телефона в интернете есть свой уникальный цифровой адрес — как почтовый индекс, только для техники.</p>
-            </div>
-
-            <div class="para-block">
-                <p class="para-full">Когда вы заходите на сайт, ваш компьютер поступает как вежливый гость: он сначала смотрит на свой собственный адрес (чтобы сайт знал, куда присылать ответ), а потом пишет на конверте адрес назначения. В ответе, который приходит от сервера, тоже есть "обратный адрес" и "адрес получателя" (вашего устройства). Именно благодаря этому система понимает, что картинки с котиками должны прилететь именно на ваш ноутбук, а не к соседу этажом выше.</p>
-                <p class="para-simple" style="display:none">IP-адрес нужен для того, чтобы интернет знал, кому отдать картинку или видео, которые вы запросили.</p>
-            </div>
-
-            <h2>Раздел 3: DNS</h2>
-
-            <div class="para-block">
-                <p class="para-full">Запоминать наборы цифр вроде 172.217.16.196 для каждого сайта, который мы хотим посетить, было бы пыткой. Поэтому придумали DNS — систему доменных имён. Это гигантская адресная книга интернета. Когда вы вбиваете в браузере "google.com", ваш компьютер не знает, куда идти. Он стучится к ближайшему DNS-серверу и спрашивает: "Слушай, я знаю имя Google, но где его дом? Дай мне цифры!". Сервер ищет в своей базе и возвращает нужный IP-адрес.</p>
-                <p class="para-simple" style="display:none">DNS — это как телефонная книга для интернета: вы вводите название сайта буквами, а система находит его настоящий цифровой адрес.</p>
+                <p class="para-full">Когда вы вводите адрес сайта в браузере, начинается целая цепочка событий. Сначала браузер обращается к DNS-серверу — это как звонок в справочную службу: "Скажите, какой IP-адрес у сайта example.com?" Получив ответ, браузер устанавливает соединение с сервером и отправляет HTTP-запрос. Сервер отвечает HTML-кодом — инструкцией по сборке страницы. Браузер разбирает этот код, загружает картинки, шрифты и скрипты, а затем собирает всё это в то, что вы видите на экране — примерно как строитель, получивший чертежи и начавший возводить дом по ним.</p>
+                <p class="para-simple" style="display:none">Когда вы вводите адрес сайта, браузер сначала узнаёт его IP-адрес, потом запрашивает страницу и собирает её из кода — как строитель по чертежу.</p>
             </div>
 
             <div class="para-block">
-                <p class="para-full">Процесс поиска адреса занимает миллисекунды и происходит в несколько этапов. Если ваш местный DNS-сервер не знает адреса сайта, он начинает спрашивать вышестоящих "коллег": "Кто отвечает за зону .com? А кто знает про google?". Это называется рекурсивный запрос. Всё это напоминает сарафанное радио, когда вы ищете нужного человека через знакомых, пока не найдёте того, кто знает точный адрес. Чтобы ускорить работу, DNS-сервера запоминают (кэшируют) частые запросы, поэтому второй раз тот же сайт открывается быстрее.</p>
-                <p class="para-simple" style="display:none">Если один DNS-сервер не знает адрес сайта, он спрашивает у других, пока не найдёт нужный. А потом запоминает его, чтобы в следующий раз ответить быстрее.</p>
+                <p class="para-full">HTML — это скелет страницы, CSS — её внешность, а JavaScript — мышцы, которые делают её живой. Когда браузер встречает тег &lt;script&gt;, он останавливает загрузку страницы и выполняет код. Именно поэтому разработчики часто размещают скрипты в конце страницы — чтобы пользователь увидел контент раньше, чем начнёт работать весь JavaScript. Современные браузеры настолько оптимизированы, что могут отображать первый экран страницы всего за 50–100 миллисекунд — быстрее, чем вы успеваете моргнуть.</p>
+                <p class="para-simple" style="display:none">Сайт состоит из трёх частей: HTML — структура, CSS — внешний вид, JavaScript — интерактивность. Браузер собирает их вместе и показывает страницу.</p>
             </div>
 
-            <h2>Раздел 4: HTTP и браузер</h2>
+            <h2>Раздел 3: Облака и серверы</h2>
 
             <div class="para-block">
-                <p class="para-full">Итак, адрес сайта мы нашли. Но как объяснить серверу, что мы хотим от него получить? Для этого существует протокол HTTP — набор правил вежливости и язык, на котором говорит ваш браузер. Когда вы нажимаете Enter, браузер составляет специальное письмо-запрос: "Привет, сервер! Я — браузер Chrome с Windows. Хочу получить главную страницу. Если у тебя есть обновлённая версия с 5 утра, давай её". Сервер получает это письмо, обрабатывает и отправляет обратно ответ, упакованный по тем же правилам.</p>
-                <p class="para-simple" style="display:none">HTTP — это язык общения в интернете. Ваш браузер "разговаривает" на нём с сайтами, чтобы попросить у них текст или картинки.</p>
-            </div>
-
-            <div class="para-block">
-                <p class="para-full">Браузер — это не просто окошко, а сложный переводчик и художник в одном лице. Получив ответ от сервера (код страницы на языке HTML), он не показывает вам этот код. Вместо этого браузер читает инструкции: "Здесь помести заголовок синим цветом, сюда вставь картинку, а при нажатии на эту кнопку покажи форму регистрации". Он выполняет эти команды, и на экране появляется красивая страница с картинками и кнопками, которую мы видим.</p>
-                <p class="para-simple" style="display:none">Браузер берёт скучный код, который приходит с сервера, и рисует из него красивую страничку с картинками и кнопочками, удобную для вас.</p>
-            </div>
-
-            <h2>Раздел 5: Серверы</h2>
-
-            <div class="para-block">
-                <p class="para-full">Когда вы заходите на сайт, вы общаетесь не с каким-то абстрактным "порталом", а с конкретным компьютером, который стоит в стойке среди тысяч таких же в огромном здании — дата-центре. Этот компьютер называется сервером. В отличие от вашего ПК, у него нет монитора и клавиатуры, зато у него зверская мощность и жёсткие диски, которые крутятся годами без остановки. Сервер — это работяга, цель которого — слушать входящие запросы и раздавать файлы 24/7. Если сайт популярный (как YouTube), то его "держат" тысячи таких серверов одновременно.</p>
-                <p class="para-simple" style="display:none">Сервер — это мощный компьютер, который никогда не выключается и хранит у себя все файлы сайта. Когда вы заходите на сайт, вы просто скачиваете эти файлы к себе.</p>
+                <p class="para-full">Слово "облако" стало одним из самых затасканных в технологическом жаргоне, но за ним стоит вполне конкретная реальность. Когда вы сохраняете фото в iCloud или Google Фото, оно отправляется на физические серверы — огромные компьютеры, которые стоят в специальных зданиях, называемых дата-центрами. Эти здания похожи на промышленные склады: внутри тысячи серверных стоек, системы охлаждения, работающие круглосуточно, резервные генераторы на случай отключения электричества. Google, Amazon и Microsoft владеют сотнями таких центров по всему миру.</p>
+                <p class="para-simple" style="display:none">"Облако" — это просто чужие компьютеры в больших зданиях. Ваши файлы хранятся на серверах в дата-центрах, которые работают 24/7 без остановок.</p>
             </div>
 
             <div class="para-block">
-                <p class="para-full">Чтобы сайт открывался быстро в любой точке мира, серверы не держат в одном месте. Их копии размещают в разных странах — в Нью-Йорке, Лондоне, Сингапуре, Москве. Это называется CDN (сеть доставки контента). Когда вы из Владивостока заходите на сайт, который физически находится в Америке, запрос не летит через весь океан. Система автоматически перенаправляет вас на ближайшую копию сервера — например, в Японии.</p>
-                <p class="para-simple" style="display:none">Чтобы сайты грузились быстро у всех, их копии хранят на серверах по всему миру. Вы автоматически подключаетесь к тому серверу, который географически к вам ближе.</p>
+                <p class="para-full">Зачем нужны облака, если можно хранить всё на своём компьютере? Надёжность. Ваш ноутбук может упасть, сгореть или быть украден. Дата-центр дублирует каждый файл в нескольких копиях, иногда в разных странах. Если один сервер выходит из строя, другой мгновенно подхватывает работу — пользователь ничего не замечает. Это называется отказоустойчивостью. Крупные облачные сервисы гарантируют доступность данных 99.99% времени — то есть простой не более 52 минут в год.</p>
+                <p class="para-simple" style="display:none">Облако надёжнее личного компьютера: файлы хранятся в нескольких копиях в разных местах. Если один сервер сломается, другой продолжит работу — вы ничего не потеряете.</p>
             </div>
 
-            <h2>Раздел 6: Безопасность и HTTPS</h2>
+            <h2>Раздел 4: Безопасность в сети</h2>
 
             <div class="para-block">
                 <p class="para-full">Представьте, что вы пишете письмо другу на открытке. Любой почтальон, любой человек за вашей спиной может прочитать секреты. Раньше обычный HTTP работал именно так — данные летели по сети в открытом виде. Это опасно, особенно если вы вводите пароль или номер карты в кафе с общественным Wi-Fi. Злоумышленник может устроить "прослушку" и украсть данные. Именно поэтому придумали HTTPS — защищённую версию протокола. Та самая буква S означает Secure (безопасный).</p>
@@ -98,12 +361,30 @@
         </main>
     </div>
 
-    <!-- Порядок подключения скриптов критичен: -->
-    <!-- 1. storage.js  — должен быть ДО sensor.js (EchoStorage нужен при первом updateKIM) -->
-    <!-- 2. sensor.js   — считает КИМ, вызывает EchoStorage.saveKIM и applyAdaptation     -->
-    <!-- 3. adapter.js  — меняет режим отображения; должен быть ПОСЛЕ sensor.js            -->
+    <!--
+        ══════════════════════════════════════════════════════════
+        ПОРЯДОК СКРИПТОВ v6.0 — КРИТИЧЕН, НЕ МЕНЯТЬ
+        ══════════════════════════════════════════════════════════
+        1. tensorflow.js  — нейросеть в браузере (CDN, опционально)
+                           Если убрать — sensor.js автоматически
+                           переключится на режим эвристики
+        2. storage.js     — localStorage профиль (v5.0)
+                           ДОЛЖЕН быть ДО sensor.js
+        3. sensor.js      — вычисление КИМ v6.0
+                           🧠 нейросеть или ⚙ эвристика
+        4. adapter.js     — адаптация контента (v4.0)
+                           ДОЛЖЕН быть ПОСЛЕ sensor.js
+        ──────────────────────────────────────────────────────────
+        Будущие подключения (раскомментировать по мере готовности):
+        5. analytics.js   — Supabase телеметрия (v7.1)
+        6. echosreda.js   — универсальный SDK (v7.0)
+        ══════════════════════════════════════════════════════════
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
     <script src="storage.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
-</body>
-</html>
+    <!-- <script src="analytics.js"></script> -->
+
+
+</body></html>

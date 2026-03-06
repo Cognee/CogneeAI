@@ -520,6 +520,7 @@
                 if (after) frag.appendChild(document.createTextNode(after));
 
                 textNode.parentNode.replaceChild(frag, textNode);
+        
             });
         });
     }
