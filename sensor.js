@@ -1,11 +1,10 @@
-// sensor.js — v6.2
-// Файл: sensor.js | Глобальная версия: 6.2
-// Изменения v6.2 (фикс загрузки модели на GitHub Pages):
-//   - Убран HEAD-запрос: GitHub Pages блокирует HEAD с cache:no-store → возвращал false даже при наличии файла
-//   - modelFileExists() заменён на GET-запрос с mode:'cors' — корректно работает на GitHub Pages
-//   - Таймаут проверки увеличен до 5 сек (GitHub Pages иногда медленно отдаёт первый запрос)
-//   - Таймаут загрузки модели увеличен до 15 сек (weights.bin может быть большим)
-//   - Добавлен лог URL который реально запрашивается — для диагностики путей
+// sensor.js — v6.3
+// Файл: sensor.js | Глобальная версия: 6.3
+// Изменения v6.3 (фикс AbortSignal + postMessage баг TF.js):
+//   - Убран AbortController из fetch: TF.js использует Web Workers с postMessage,
+//     которые не умеют клонировать AbortSignal → падало с "could not be cloned"
+//   - modelFileExists() теперь чистый fetch без signal — таймаут через Promise.race
+//   - Логика таймаутов сохранена через withTimeout() без AbortController
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -218,29 +217,24 @@
     // ─── ЗАГРУЗКА МОДЕЛИ ──────────────────────────────────────────────────────
 
     // Вспомогательная: проверяем доступность model.json через GET (не HEAD — GitHub Pages блокирует HEAD)
+    // Без AbortController: TF.js использует Web Workers с postMessage,
+    // которые не умеют клонировать AbortSignal → "could not be cloned"
+    // Таймаут реализован через withTimeout + Promise.race
     async function modelFileExists() {
+        const absoluteURL = new URL(MODEL_PATH, window.location.href).href;
+        console.log('[ЭхоСреда] Проверяю:', absoluteURL);
         try {
-            const controller = new AbortController();
-            const timeoutId  = setTimeout(() => controller.abort(), 5000);
-
-            // Строим абсолютный URL для диагностики в консоли
-            const absoluteURL = new URL(MODEL_PATH, window.location.href).href;
-            console.log('[ЭхоСреда] Проверяю:', absoluteURL);
-
-            const res = await fetch(absoluteURL, {
-                method: 'GET',
-                mode:   'cors',
-                signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-
+            const res = await withTimeout(
+                fetch(absoluteURL, { method: 'GET', mode: 'cors' }),
+                5000,
+                'modelFileExists'
+            );
             if (!res.ok) {
-                console.log('[ЭхоСреда] Сервер ответил', res.status, 'для', absoluteURL);
+                console.log('[ЭхоСреда] Сервер ответил', res.status);
             }
             return res.ok;
         } catch (err) {
-            // file://, abort, CORS, сеть — считаем что файла нет
-            console.log('[ЭхоСреда] fetch упал:', err.message);
+            console.log('[ЭхоСреда] Проверка модели не удалась:', err.message);
             return false;
         }
     }
