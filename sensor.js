@@ -1,9 +1,10 @@
-// sensor.js — v6.6
-// Файл: sensor.js | Глобальная версия: 6.6
-// Изменения v6.6 (диагностика + loadGraphModel вместо loadLayersModel):
-//   - Попытка 1: tf.loadLayersModel с подробными логами на каждом шаге
-//   - Попытка 2: если зависает — tf.loadGraphModel (другой парсер весов)
-//   - Добавлены логи между каждым шагом загрузки для точной локализации зависания
+// sensor.js — v6.7
+// Файл: sensor.js | Глобальная версия: 6.7
+// Изменения v6.7 (переход на graph model):
+//   - Модель переконвертирована в tfjs_graph_model (SimpleRNN вместо LSTM — нет CudnnRNNV3)
+//   - Загрузка через tf.loadGraphModel напрямую — без попытки loadLayersModel
+//   - predict() для graph model возвращает тензор напрямую, не массив
+//   - Убрана двухшаговая логика загрузки — только loadGraphModel
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -118,6 +119,7 @@
             const t0           = performance.now();
             const features     = buildFeatureVector();
             const inputTensor  = window.tf.tensor3d([[features]], [1, 1, 8]);
+            // graph model predict() возвращает тензор напрямую (не массив как layers model)
             const outTensor    = tfModel.predict(inputTensor);
             const proba        = await outTensor.data();
             inputTensor.dispose();
@@ -252,33 +254,11 @@
             await window.tf.ready();
             console.log('[ЭхоСреда] Бэкенд:', window.tf.getBackend());
 
-            // Шаг 1: пробуем loadLayersModel
-            console.log('[ЭхоСреда] Шаг 1: loadLayersModel...');
-            let loaded = false;
-
-            // Ручной таймаут через флаг — не прерываем fetch TF.js,
-            // просто фиксируем что прошло слишком долго
-            const timeoutHandle = setTimeout(() => {
-                if (!loaded) {
-                    console.warn('[ЭхоСреда] loadLayersModel завис (>20сек) → пробуем loadGraphModel');
-                }
-            }, 20000);
-
-            try {
-                tfModel = await window.tf.loadLayersModel(absoluteURL);
-                loaded = true;
-                clearTimeout(timeoutHandle);
-                console.log('[ЭхоСреда] Шаг 1 успешен: loadLayersModel OK');
-            } catch (layersErr) {
-                clearTimeout(timeoutHandle);
-                console.warn('[ЭхоСреда] loadLayersModel упал:', layersErr.message);
-                console.log('[ЭхоСреда] Шаг 2: пробуем loadGraphModel...');
-
-                // Шаг 2: fallback на loadGraphModel — другой парсер весов
-                tfModel = await window.tf.loadGraphModel(absoluteURL);
-                loaded = true;
-                console.log('[ЭхоСреда] Шаг 2 успешен: loadGraphModel OK');
-            }
+            // Graph model — конвертирована через tensorflowjs_converter из SavedModel
+            // SimpleRNN вместо LSTM: нет CudnnRNNV3, полная совместимость с браузером
+            console.log('[ЭхоСреда] Загружаю graph model...');
+            tfModel = await window.tf.loadGraphModel(absoluteURL);
+            console.log('[ЭхоСреда] loadGraphModel OK');
 
             const ms = Math.round(performance.now() - t0);
             modelLoadSuccess = true;
