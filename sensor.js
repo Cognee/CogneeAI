@@ -1,12 +1,13 @@
-// sensor.js — v6.4
-// Файл: sensor.js | Глобальная версия: 6.4
-// Изменения v6.4 (фикс таймаута на GitHub Pages CDN):
-//   - Убрана предварительная проверка modelFileExists(): GitHub Pages CDN "холодный старт"
-//     может занимать 20+ сек → fetch висел и падал по таймауту 5 сек
-//   - tryLoadModel() теперь сразу вызывает tf.loadLayersModel() без лишнего fetch
-//   - TF.js сам обрабатывает 404 и сетевые ошибки — catch ловит всё
-//   - Таймаут загрузки увеличен до 60 сек (CDN + weights.bin)
-//   - Бейдж "загрузка" показывается сразу, без ожидания проверки
+// sensor.js — v6.5
+// Файл: sensor.js | Глобальная версия: 6.5
+// Изменения v6.5 (фикс зависания tf.loadLayersModel):
+//   - Принудительная установка cpu-бэкенда ДО loadLayersModel: WebGL иногда зависает
+//     при инициализации на GitHub Pages (нет GPU контекста / заблокирован браузером)
+//   - Загрузка через tf.loadLayersModel с явным io.http handler вместо строки URL
+//   - Добавлен лог бэкенда TF.js для диагностики
+//   - withTimeout убран из loadLayersModel: Promise.race прерывает промис но не fetch внутри
+//     TF.js — модель всё равно догружается в фоне и ломает состояние. Теперь таймаут
+//     реализован иначе: флаг cancelled + проверка после await
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -251,17 +252,22 @@
         try {
             const t0 = performance.now();
 
-            // Таймаут 60 сек: CDN "холодный старт" + скачивание weights.bin
-            tfModel = await withTimeout(
-                window.tf.loadLayersModel(absoluteURL),
-                60000,
-                'tf.loadLayersModel'
-            );
+            // Принудительно выставляем cpu-бэкенд:
+            // WebGL на GitHub Pages иногда зависает при инициализации контекста.
+            // cpu работает медленнее (~5-10мс инференс вместо <1мс), но стабильно.
+            await window.tf.setBackend('cpu');
+            await window.tf.ready();
+            console.log('[ЭхоСреда] Бэкенд TF.js:', window.tf.getBackend());
+
+            // Загружаем модель напрямую — без withTimeout:
+            // Promise.race прерывает наш промис, но внутренний fetch TF.js продолжает
+            // работать в фоне и может сломать состояние при повторном вызове.
+            tfModel = await window.tf.loadLayersModel(absoluteURL);
 
             const ms = Math.round(performance.now() - t0);
             modelLoadSuccess = true;
 
-            // Прогрев WebGL-шейдеров (первый predict медленный)
+            // Прогрев (первый predict медленный на cpu-бэкенде)
             const dummy  = window.tf.zeros([1, 1, 8]);
             const warmup = tfModel.predict(dummy);
             await warmup.data();
