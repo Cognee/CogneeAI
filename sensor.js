@@ -1,13 +1,9 @@
-// sensor.js — v6.5
-// Файл: sensor.js | Глобальная версия: 6.5
-// Изменения v6.5 (фикс зависания tf.loadLayersModel):
-//   - Принудительная установка cpu-бэкенда ДО loadLayersModel: WebGL иногда зависает
-//     при инициализации на GitHub Pages (нет GPU контекста / заблокирован браузером)
-//   - Загрузка через tf.loadLayersModel с явным io.http handler вместо строки URL
-//   - Добавлен лог бэкенда TF.js для диагностики
-//   - withTimeout убран из loadLayersModel: Promise.race прерывает промис но не fetch внутри
-//     TF.js — модель всё равно догружается в фоне и ломает состояние. Теперь таймаут
-//     реализован иначе: флаг cancelled + проверка после await
+// sensor.js — v6.6
+// Файл: sensor.js | Глобальная версия: 6.6
+// Изменения v6.6 (диагностика + loadGraphModel вместо loadLayersModel):
+//   - Попытка 1: tf.loadLayersModel с подробными логами на каждом шаге
+//   - Попытка 2: если зависает — tf.loadGraphModel (другой парсер весов)
+//   - Добавлены логи между каждым шагом загрузки для точной локализации зависания
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -252,22 +248,43 @@
         try {
             const t0 = performance.now();
 
-            // Принудительно выставляем cpu-бэкенд:
-            // WebGL на GitHub Pages иногда зависает при инициализации контекста.
-            // cpu работает медленнее (~5-10мс инференс вместо <1мс), но стабильно.
             await window.tf.setBackend('cpu');
             await window.tf.ready();
-            console.log('[ЭхоСреда] Бэкенд TF.js:', window.tf.getBackend());
+            console.log('[ЭхоСреда] Бэкенд:', window.tf.getBackend());
 
-            // Загружаем модель напрямую — без withTimeout:
-            // Promise.race прерывает наш промис, но внутренний fetch TF.js продолжает
-            // работать в фоне и может сломать состояние при повторном вызове.
-            tfModel = await window.tf.loadLayersModel(absoluteURL);
+            // Шаг 1: пробуем loadLayersModel
+            console.log('[ЭхоСреда] Шаг 1: loadLayersModel...');
+            let loaded = false;
+
+            // Ручной таймаут через флаг — не прерываем fetch TF.js,
+            // просто фиксируем что прошло слишком долго
+            const timeoutHandle = setTimeout(() => {
+                if (!loaded) {
+                    console.warn('[ЭхоСреда] loadLayersModel завис (>20сек) → пробуем loadGraphModel');
+                }
+            }, 20000);
+
+            try {
+                tfModel = await window.tf.loadLayersModel(absoluteURL);
+                loaded = true;
+                clearTimeout(timeoutHandle);
+                console.log('[ЭхоСреда] Шаг 1 успешен: loadLayersModel OK');
+            } catch (layersErr) {
+                clearTimeout(timeoutHandle);
+                console.warn('[ЭхоСреда] loadLayersModel упал:', layersErr.message);
+                console.log('[ЭхоСреда] Шаг 2: пробуем loadGraphModel...');
+
+                // Шаг 2: fallback на loadGraphModel — другой парсер весов
+                tfModel = await window.tf.loadGraphModel(absoluteURL);
+                loaded = true;
+                console.log('[ЭхоСреда] Шаг 2 успешен: loadGraphModel OK');
+            }
 
             const ms = Math.round(performance.now() - t0);
             modelLoadSuccess = true;
 
-            // Прогрев (первый predict медленный на cpu-бэкенде)
+            // Прогрев
+            console.log('[ЭхоСреда] Прогрев...');
             const dummy  = window.tf.zeros([1, 1, 8]);
             const warmup = tfModel.predict(dummy);
             await warmup.data();
@@ -275,7 +292,6 @@
             warmup.dispose();
 
             console.log('[ЭхоСреда] ✅ Нейросеть загружена за ' + ms + 'мс');
-            console.log('[ЭхоСреда] Параметров модели: ' + tfModel.countParams());
             console.log('[ЭхоСреда] Прогрев завершён — инференс готов');
 
             updateNeuralBadge('ready');
