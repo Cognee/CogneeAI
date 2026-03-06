@@ -1,13 +1,11 @@
-
-// sensor.js — v6.0
-// Файл: sensor.js | Глобальная версия: 6.0
-// Изменения v6.0 (Недели 5-6: TensorFlow.js в браузере):
-//   - Финальная интеграция нейросети TF.js в качестве основного движка КИМ
-//   - Улучшенный UI-индикатор: бейдж «🧠 Нейросеть» / «⚙ Эвристика» с анимацией
-//   - Публичный API window.EchoNeural с вероятностями классов для отладки/SDK
-//   - Детализированный лог инициализации с метриками производительности
-//   - Адаптивный порог сглаживания: нейросеть — ALPHA=0.25, эвристика — ALPHA=0.35
-//   - window.EchoSensorState.lastProbabilities — доступ к сырым proba для SDK v7.0
+// sensor.js — v6.1
+// Файл: sensor.js | Глобальная версия: 6.1
+// Изменения v6.1 (фикс зависания бейджа «загрузка»):
+//   - Добавлен предварительный fetch-ping: проверяем существование model.json ДО tf.loadLayersModel
+//   - Promise.race с таймаутом 8 сек: если TF.js завис — автоматический fallback
+//   - Бейдж «загрузка» больше не висит вечно ни на file://, ни на GitHub Pages
+//   - Если папка model/ не залита на GitHub — сразу переключается на эвристику
+//   - Исправлено: catch теперь ловит все типы ошибок (не только сообщения с '404')
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -218,6 +216,33 @@
     }
 
     // ─── ЗАГРУЗКА МОДЕЛИ ──────────────────────────────────────────────────────
+
+    // Вспомогательная: проверяем, доступен ли model.json (fetch ping, таймаут 3 сек)
+    async function modelFileExists() {
+        try {
+            const controller = new AbortController();
+            const timeoutId  = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(MODEL_PATH, {
+                method: 'HEAD',
+                signal: controller.signal,
+                cache:  'no-store',
+            });
+            clearTimeout(timeoutId);
+            return res.ok; // true = файл есть, false = 404 и т.п.
+        } catch {
+            // fetch упал (file://, abort, сеть) — считаем что файла нет
+            return false;
+        }
+    }
+
+    // Вспомогательная: Promise с таймаутом
+    function withTimeout(promise, ms, label) {
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout: ' + label + ' (' + ms + 'мс)')), ms)
+        );
+        return Promise.race([promise, timeout]);
+    }
+
     async function tryLoadModel() {
         if (modelLoadAttempted) return;
         modelLoadAttempted = true;
@@ -228,14 +253,36 @@
             return;
         }
 
-        updateNeuralBadge('loading');
         console.log('[ЭхоСреда] TensorFlow.js v' + window.tf.version.tfjs);
+
+        // ── ШАГ 1: ping — существует ли model.json? ──────────────────────────
+        console.log('[ЭхоСреда] Проверяю наличие', MODEL_PATH, '...');
+        const exists = await modelFileExists();
+
+        if (!exists) {
+            console.log('[ЭхоСреда] ⚠ model/model.json не найден → эвристика');
+            console.log('[ЭхоСреда] Чтобы активировать нейросеть:');
+            console.log('[ЭхоСреда]   1. Обучи модель в Colab (Промт 4)');
+            console.log('[ЭхоСреда]   2. Скопируй папку echo_model/ → model/ в проект');
+            console.log('[ЭхоСреда]   3. Залей папку model/ на GitHub вместе с остальными файлами');
+            updateNeuralBadge('fallback');
+            return;
+        }
+
+        // ── ШАГ 2: загружаем модель (таймаут 8 сек) ──────────────────────────
+        updateNeuralBadge('loading');
         console.log('[ЭхоСреда] Загружаю нейросеть из', MODEL_PATH, '...');
 
         try {
-            const t0   = performance.now();
-            tfModel    = await window.tf.loadLayersModel(MODEL_PATH);
-            const ms   = Math.round(performance.now() - t0);
+            const t0 = performance.now();
+
+            tfModel = await withTimeout(
+                window.tf.loadLayersModel(MODEL_PATH),
+                8000,
+                'tf.loadLayersModel'
+            );
+
+            const ms = Math.round(performance.now() - t0);
             modelLoadSuccess = true;
 
             // Прогрев WebGL-шейдеров (первый predict медленный)
@@ -254,15 +301,7 @@
         } catch (err) {
             tfModel          = null;
             modelLoadSuccess = false;
-
-            if (err.message && err.message.includes('404')) {
-                console.log('[ЭхоСреда] ⚠ model/model.json не найден → эвристика');
-                console.log('[ЭхоСреда] Как активировать нейросеть:');
-                console.log('[ЭхоСреда]   1. Обучи модель в Colab (Промт 4)');
-                console.log('[ЭхоСреда]   2. Скопируй папку echo_model/ → model/ в проект');
-            } else {
-                console.warn('[ЭхоСреда] Ошибка загрузки:', err.message, '→ эвристика');
-            }
+            console.warn('[ЭхоСреда] Ошибка/таймаут загрузки модели:', err.message, '→ эвристика');
             updateNeuralBadge('fallback');
         }
     }
