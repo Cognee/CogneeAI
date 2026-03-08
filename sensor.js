@@ -1,22 +1,28 @@
-// sensor.js — v7.2
-// Файл: sensor.js | Глобальная версия: 7.2
-// Изменения v7.2 (веса вынесены в отдельный файл):
-//   - Веса модели перенесены в weights.js — sensor.js стал компактным
-//   - weights.js подключается в index.html ДО sensor.js
-//   - const W берётся из глобального скоупа weights.js
+// sensor.js — v8.0
+// Файл: sensor.js | Глобальная версия: 8.0
+// Изменения v8.0 (16 признаков + ONNX инференс):
+//   - Вектор признаков расширен с 8 до 16
+//   - Новые сенсоры: dwell_without_progress, micro_scroll_corrections,
+//     paragraph_reread_rate, scroll_direction_changes, reading_speed_variance,
+//     interaction_gap, touch_input, viewport_lock_duration
+//   - Инференс переведён с weights.js на ONNX Runtime Web
+//   - weights.js больше не нужен — удали из репозитория и index.html
+//   - Модель загружается из model/cognee_ai.onnx
+//   - Исправлен баг: "завис на абзаце" теперь не считается flow
 
 (function () {
     if (window.__sensorsInitialized) return;
     window.__sensorsInitialized = true;
 
     // ─── КОНСТАНТЫ ────────────────────────────────────────────────────────────
-    const SMOOTH_ALPHA_NEURAL    = 0.25; // нейросеть — плавнее
-    const SMOOTH_ALPHA_HEURISTIC = 0.35; // эвристика — быстрее
+    const SMOOTH_ALPHA_NEURAL    = 0.25;
+    const SMOOTH_ALPHA_HEURISTIC = 0.35;
     const KIM_CHANGE_THRESHOLD   = 8;
     const UPDATE_INTERVAL_MS     = 20000;
-    const MODEL_PATH             = 'model/model.json';
+    const MODEL_PATH             = 'model/cognee_ai.onnx';
+    const FEATURE_SIZE           = 16;
 
-    // ─── СОСТОЯНИЕ СЧЁТЧИКОВ ──────────────────────────────────────────────────
+    // ─── БАЗОВЫЕ СЧЁТЧИКИ ─────────────────────────────────────────────────────
     let scrollScore          = 70;
     let clickScore           = 70;
     let returnScore          = 80;
@@ -31,46 +37,88 @@
     let lastReturnCleanup    = Date.now();
     const returnEvents       = [];
 
-    // ─── СОСТОЯНИЕ НЕЙРОСЕТИ ─────────────────────────────────────────────────
-    let tfModel              = null;
-    let modelLoadAttempted   = false;
-    let modelLoadSuccess     = false;
-    let lastProbabilities    = null;
-    let inferenceCount       = 0;
-    let inferenceTimeTotal   = 0;
+    // ─── НОВЫЕ СЕНСОРЫ (признаки 8–15) ───────────────────────────────────────
+
+    // f8: dwell_without_progress
+    let dwellWithoutProgressMs = 0;
+    let lastForwardScrollTime  = Date.now();
+
+    // f9: micro_scroll_corrections
+    let microScrollCount     = 0;
+    let lastMicroScrollReset = Date.now();
+
+    // f10: paragraph_reread_rate
+    const paragraphVisits    = new Map();
+    let paragraphRereadsTotal = 0;
+    let paragraphsTracked    = 0;
+
+    // f11: scroll_direction_changes
+    let directionChangeCount  = 0;
+    let lastScrollDirection   = 'none';
+    let directionWindowReset  = Date.now();
+
+    // f12: reading_speed_variance
+    const speedSamples = [];
+
+    // f13: interaction_gap
+    const interactionTimes = [];
+
+    // f14: touch_input
+    let isTouchDevice = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) ? 1.0 : 0.0;
+
+    // f15: viewport_lock_duration
+    let viewportLockSec   = 0;
+    let viewportLockStart = Date.now();
+    let lastViewportY     = window.scrollY;
+
+    // ─── СОСТОЯНИЕ ONNX ───────────────────────────────────────────────────────
+    let onnxSession        = null;
+    let modelLoadSuccess   = false;
+    let lastProbabilities  = null;
+    let inferenceCount     = 0;
+    let inferenceTimeTotal = 0;
 
     const clamp   = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const getZone = kim => kim > 70 ? 'focus' : kim >= 40 ? 'normal' : 'tired';
 
     window.currentKIM = 70;
 
-    // ─── ПУБЛИЧНЫЙ API ДЛЯ ОТЛАДКИ И SDK ─────────────────────────────────────
+    // ─── ПУБЛИЧНЫЙ API ────────────────────────────────────────────────────────
+    const FEATURE_NAMES = [
+        'scroll_avg_interval', 'scroll_variance', 'click_pause_avg',
+        'return_scroll_count', 'session_duration_norm', 'hour_norm',
+        'consecutive_rereads', 'idle_bursts',
+        'dwell_without_progress', 'micro_scroll_corrections',
+        'paragraph_reread_rate', 'scroll_direction_changes',
+        'reading_speed_variance', 'interaction_gap',
+        'touch_input', 'viewport_lock_duration',
+    ];
+
     window.CogneeSensorState = {
-        get scrollScore()         { return scrollScore; },
-        get clickScore()          { return clickScore; },
-        get returnScore()         { return returnScore; },
-        get consecutiveRereads()  { return consecutiveRereads; },
-        get idleBursts()          { return idleBursts; },
-        get smoothedKIM()         { return smoothedKIM; },
-        get modelLoaded()         { return modelLoadSuccess; },
-        get usingNeural()         { return modelLoadSuccess; },
-        get lastProbabilities()   { return lastProbabilities; },
+        get scrollScore()        { return scrollScore; },
+        get clickScore()         { return clickScore; },
+        get returnScore()        { return returnScore; },
+        get consecutiveRereads() { return consecutiveRereads; },
+        get idleBursts()         { return idleBursts; },
+        get smoothedKIM()        { return smoothedKIM; },
+        get modelLoaded()        { return modelLoadSuccess; },
+        get usingNeural()        { return modelLoadSuccess; },
+        get lastProbabilities()  { return lastProbabilities; },
+        get isTouchDevice()      { return isTouchDevice === 1.0; },
         get avgInferenceMs() {
-            return inferenceCount > 0
-                ? Math.round(inferenceTimeTotal / inferenceCount)
-                : null;
+            return inferenceCount > 0 ? Math.round(inferenceTimeTotal / inferenceCount) : null;
         },
     };
 
-    // Публичный API нейросети
     window.CogneeNeural = {
         get loaded()        { return modelLoadSuccess; },
         get probabilities() { return lastProbabilities; },
         get inferenceMs()   { return window.CogneeSensorState.avgInferenceMs; },
         getFeatures()       { return buildFeatureVector(); },
+        getFeatureNames()   { return FEATURE_NAMES; },
     };
 
-    // ─── ХРОНОБИОЛОГИЧЕСКИЙ БОНУС ────────────────────────────────────────────
+    // ─── ХРОНОБИОЛОГИЧЕСКИЙ БОНУС ─────────────────────────────────────────────
     function getChronoBonus() {
         const h = new Date().getHours();
         if ((h >= 9 && h <= 11) || (h >= 17 && h <= 19)) return 8;
@@ -79,7 +127,7 @@
         return 0;
     }
 
-    // ─── ВЫЧИСЛЕНИЕ МЕТРИК ДЛЯ ПРИЗНАКОВ ─────────────────────────────────────
+    // ─── ВСПОМОГАТЕЛЬНЫЕ ВЫЧИСЛЕНИЯ ───────────────────────────────────────────
     function computeScrollAvgInterval() {
         if (scrollTimestamps.length < 2) return 250;
         let sum = 0;
@@ -94,70 +142,68 @@
         for (let i = 1; i < scrollTimestamps.length; i++)
             intervals.push(scrollTimestamps[i] - scrollTimestamps[i - 1]);
         const avg = intervals.reduce((s, v) => s + v, 0) / intervals.length;
-        const variance = intervals.reduce((s, v) => s + (v - avg) ** 2, 0) / intervals.length;
-        return Math.sqrt(variance);
+        return Math.sqrt(intervals.reduce((s, v) => s + (v - avg) ** 2, 0) / intervals.length);
     }
 
-    // ─── ВЕКТОР 8 ПРИЗНАКОВ (нормализация = датасет Colab) ───────────────────
+    function computeReadingSpeedVariance() {
+        if (speedSamples.length < 3) return 0;
+        const avg = speedSamples.reduce((s, v) => s + v, 0) / speedSamples.length;
+        if (avg === 0) return 0;
+        const sigma = Math.sqrt(speedSamples.reduce((s, v) => s + (v - avg) ** 2, 0) / speedSamples.length);
+        return sigma / avg;
+    }
+
+    function computeInteractionGap() {
+        if (interactionTimes.length < 2) return 5000;
+        let sum = 0;
+        for (let i = 1; i < interactionTimes.length; i++)
+            sum += interactionTimes[i] - interactionTimes[i - 1];
+        return sum / (interactionTimes.length - 1);
+    }
+
+    function recordInteraction() {
+        const now = Date.now();
+        interactionTimes.push(now);
+        if (interactionTimes.length > 10) interactionTimes.shift();
+        lastActivityTime = now;
+    }
+
+    // ─── ВЕКТОР 16 ПРИЗНАКОВ ─────────────────────────────────────────────────
     function buildFeatureVector() {
-        const f0 = clamp(computeScrollAvgInterval() / 500.0, 0, 1);             // scroll_avg_interval
-        const f1 = clamp(computeScrollVariance() / 200.0, 0, 1);               // scroll_variance
-        const f2 = clamp(recentClickPause / 1000.0, 0, 1);                     // click_pause_avg
-        const f3 = clamp(returnEventsInWindow / 10.0, 0, 1);                   // return_scroll_count
-        const f4 = clamp((Date.now() - sessionStart) / (60 * 60 * 1000), 0, 1); // session_duration_norm
-        const f5 = clamp(new Date().getHours() / 24.0, 0, 1);                  // hour_norm
-        const f6 = clamp(consecutiveRereads / 5.0, 0, 1);                      // consecutive_rereads
-        const f7 = clamp(idleBursts / 5.0, 0, 1);                              // idle_bursts
-        return [f0, f1, f2, f3, f4, f5, f6, f7];
+        const f0  = clamp(computeScrollAvgInterval() / 500.0, 0, 1);
+        const f1  = clamp(computeScrollVariance() / 200.0, 0, 1);
+        const f2  = clamp(recentClickPause / 1000.0, 0, 1);
+        const f3  = clamp(returnEventsInWindow / 10.0, 0, 1);
+        const f4  = clamp((Date.now() - sessionStart) / (60 * 60 * 1000), 0, 1);
+        const f5  = clamp(new Date().getHours() / 24.0, 0, 1);
+        const f6  = clamp(consecutiveRereads / 5.0, 0, 1);
+        const f7  = clamp(idleBursts / 5.0, 0, 1);
+        const f8  = clamp(dwellWithoutProgressMs / 60000, 0, 1);
+        const f9  = clamp(microScrollCount / 20.0, 0, 1);
+        const f10 = paragraphsTracked > 0 ? clamp(paragraphRereadsTotal / paragraphsTracked, 0, 1) : 0;
+        const f11 = clamp(directionChangeCount / 15.0, 0, 1);
+        const f12 = clamp(computeReadingSpeedVariance() / 2.0, 0, 1);
+        const f13 = clamp(computeInteractionGap() / 30000, 0, 1);
+        const f14 = isTouchDevice;
+        const f15 = clamp(viewportLockSec / 120.0, 0, 1);
+        return [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15];
     }
 
-    // Веса модели загружаются из weights.js (подключается в index.html до sensor.js)
-    // const W определена глобально в weights.js
-
-
-    // Вспомогательные матричные операции
-    // dot(M, v): M имеет shape (in, out), v имеет shape (in) → результат shape (out)
-    // Это x @ W в нотации numpy (вектор строка умножается на матрицу)
-    function dot(M, v) {
-        const out_size = M[0].length;
-        const result   = new Array(out_size).fill(0);
-        for (let i = 0; i < v.length; i++) {
-            for (let j = 0; j < out_size; j++) {
-                result[j] += v[i] * M[i][j];
-            }
-        }
-        return result;
-    }
-
-    function addvec(a, b) { return a.map((x, i) => x + b[i]); }
-
-    // ─── КИМ ЧЕРЕЗ ВСТРОЕННЫЙ ИНФЕРЕНС ───────────────────────────────────────
-    function computeKIMNeural() {
+    // ─── ONNX ИНФЕРЕНС ────────────────────────────────────────────────────────
+    async function computeKIMNeural() {
+        if (!onnxSession) return null;
         try {
-            const t0 = performance.now();
-            const x  = buildFeatureVector(); // [8]
+            const t0       = performance.now();
+            const features = buildFeatureVector();
 
-            // 1. SimpleRNN: h = tanh(x @ W_x + h_prev @ W_h + b)
-            //    W_x: (8,48), W_h: (48,48), b: (48,)
-            //    h_prev = 0 (один временной шаг, stateless)
-            const h0     = new Array(48).fill(0);
-            const rnn_in = addvec(addvec(dot(W.rnn_Wx, x), dot(W.rnn_Wh, h0)), W.rnn_b);
-            let h        = rnn_in.map(v => Math.tanh(v));
+            const inputTensor = new ort.Tensor(
+                'float32',
+                Float32Array.from(features),
+                [1, 1, FEATURE_SIZE]
+            );
 
-            // 2. BatchNorm (inference): (x - mean) / sqrt(var + eps) * gamma + beta
-            const eps = 1e-3;
-            h = h.map((v, i) => (v - W.bn_mean[i]) / Math.sqrt(W.bn_var[i] + eps) * W.bn_gamma[i] + W.bn_beta[i]);
-
-            // 3. Dense(24) + ReLU
-            let d1 = addvec(dot(W.d1_W, h), W.d1_b);
-            d1 = d1.map(v => Math.max(0, v));
-
-            // 4. Dense(5) + Softmax
-            let logits = addvec(dot(W.d2_W, d1), W.d2_b);
-            const maxL = Math.max(...logits);
-            const exps = logits.map(v => Math.exp(v - maxL));
-            const sumE = exps.reduce((s, v) => s + v, 0);
-            const proba = exps.map(v => v / sumE);
+            const results = await onnxSession.run({ [onnxSession.inputNames[0]]: inputTensor });
+            const proba   = Array.from(results[onnxSession.outputNames[0]].data);
 
             const elapsed = performance.now() - t0;
             inferenceCount++;
@@ -172,15 +218,13 @@
             };
 
             const kim = proba[0]*95 + proba[1]*65 + proba[2]*25 + proba[3]*35 + proba[4]*10;
-
             console.log(
-                `[CogneeAI 🧠] ` +
-                `flow:${(proba[0]*100).toFixed(1)}% ` +
-                `normal:${(proba[1]*100).toFixed(1)}% ` +
-                `tired:${(proba[2]*100).toFixed(1)}% ` +
-                `distracted:${(proba[3]*100).toFixed(1)}% ` +
-                `overload:${(proba[4]*100).toFixed(1)}% ` +
-                `→ КИМ:${kim.toFixed(1)} (${elapsed.toFixed(2)}мс)`
+                `[CogneeAI 🧠] flow:${(proba[0]*100).toFixed(1)}%` +
+                ` normal:${(proba[1]*100).toFixed(1)}%` +
+                ` tired:${(proba[2]*100).toFixed(1)}%` +
+                ` distracted:${(proba[3]*100).toFixed(1)}%` +
+                ` overload:${(proba[4]*100).toFixed(1)}%` +
+                ` → КИМ:${kim.toFixed(1)} (${elapsed.toFixed(2)}мс)`
             );
             return kim;
         } catch (err) {
@@ -189,91 +233,115 @@
         }
     }
 
-    // ─── КИМ ЧЕРЕЗ ЭВРИСТИКУ (fallback) ──────────────────────────────────────
+    // ─── ЭВРИСТИКА (fallback) ─────────────────────────────────────────────────
     function computeKIMHeuristic() {
-        const raw = (scrollScore * 0.4) + (clickScore * 0.3) + (returnScore * 0.3);
+        const dwellPenalty = clamp(dwellWithoutProgressMs / 60000, 0, 1) * 20;
+        const lockPenalty  = clamp(viewportLockSec / 120, 0, 1) * 15;
+        const microMalus   = clamp(microScrollCount / 20, 0, 1) * 10;
+        const raw = (scrollScore * 0.35) + (clickScore * 0.25) + (returnScore * 0.25)
+                  - dwellPenalty - lockPenalty - microMalus;
         return clamp(raw + getChronoBonus(), 0, 100);
     }
 
-    // ─── UI: БЕЙДЖ СТАТУСА НЕЙРОСЕТИ ─────────────────────────────────────────
+    // ─── UI: БЕЙДЖ ───────────────────────────────────────────────────────────
     function updateNeuralBadge(status) {
         let badge = document.getElementById('cognee-neural-badge');
         if (!badge) {
             badge = document.createElement('div');
             badge.id = 'cognee-neural-badge';
             badge.style.cssText = `
-                position: fixed;
-                top: 10px;
-                left: 50%;
-                transform: translateX(-50%);
-                padding: 4px 14px;
-                border-radius: 20px;
-                font-size: 11px;
-                font-family: 'Courier New', monospace;
-                font-weight: 600;
-                z-index: 9999;
-                pointer-events: none;
-                transition: opacity 0.6s ease, background 0.3s ease;
-                letter-spacing: 0.04em;
-                white-space: nowrap;
+                position:fixed; top:10px; left:50%;
+                transform:translateX(-50%);
+                padding:4px 14px; border-radius:20px;
+                font-size:11px; font-family:'Courier New',monospace;
+                font-weight:600; z-index:9999; pointer-events:none;
+                transition:opacity 0.6s ease, background 0.3s ease;
+                letter-spacing:0.04em; white-space:nowrap;
             `;
             document.body.appendChild(badge);
         }
-
         if (status === 'loading') {
-            badge.textContent = '⏳ Загружаю нейросеть...';
-            badge.style.background = '#33333388';
-            badge.style.color      = '#aaaaaa';
-            badge.style.border     = '1px solid #555555';
-            badge.style.opacity    = '1';
-
+            badge.textContent = '⏳ Загружаю CogneeAI...';
+            badge.style.cssText += 'background:#33333388;color:#aaa;border:1px solid #555;opacity:1;';
         } else if (status === 'ready') {
-            badge.textContent = '🧠 Нейросеть активна';
-            badge.style.background = '#4FC3F722';
-            badge.style.color      = '#4FC3F7';
-            badge.style.border     = '1px solid #4FC3F755';
-            badge.style.opacity    = '1';
-            // Плавно скрыть через 5 сек
+            badge.textContent = '🧠 CogneeAI активна';
+            badge.style.cssText += 'background:#4FC3F722;color:#4FC3F7;border:1px solid #4FC3F755;opacity:1;';
             setTimeout(() => { badge.style.opacity = '0'; }, 5000);
-
         } else if (status === 'fallback') {
-            badge.textContent = '⚙ Эвристика (нет model/)';
-            badge.style.background = '#FFB74D22';
-            badge.style.color      = '#FFB74D';
-            badge.style.border     = '1px solid #FFB74D55';
-            badge.style.opacity    = '1';
-            // Скрыть через 4 сек
+            badge.textContent = '⚙ Эвристика (нет модели)';
+            badge.style.cssText += 'background:#FFB74D22;color:#FFB74D;border:1px solid #FFB74D55;opacity:1;';
             setTimeout(() => { badge.style.opacity = '0'; }, 4000);
         }
     }
 
-    // ─── ИНИЦИАЛИЗАЦИЯ НЕЙРОСЕТИ ─────────────────────────────────────────────────
-    // Веса встроены в файл — никакой загрузки не нужно
+    // ─── ЗАГРУЗКА ONNX ───────────────────────────────────────────────────────
     async function tryLoadModel() {
-        // Прогрев: один тестовый инференс чтобы прогреть JIT
-        const t0     = performance.now();
-        const warmup = computeKIMNeural();
-        const ms     = Math.round(performance.now() - t0);
+        updateNeuralBadge('loading');
+        if (typeof ort === 'undefined') {
+            console.warn('[CogneeAI] onnxruntime-web не найден → эвристика');
+            updateNeuralBadge('fallback');
+            return;
+        }
+        try {
+            const t0  = performance.now();
+            const url = new URL(MODEL_PATH, window.location.href).href;
+            console.log('[CogneeAI] Загружаю ONNX:', url);
 
-        if (warmup !== null) {
+            onnxSession = await ort.InferenceSession.create(url, {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all',
+            });
+
+            console.log('[CogneeAI] Входы:', onnxSession.inputNames, '| Выходы:', onnxSession.outputNames);
+
+            // Прогрев
+            const dummy = new ort.Tensor('float32', new Float32Array(FEATURE_SIZE), [1, 1, FEATURE_SIZE]);
+            await onnxSession.run({ [onnxSession.inputNames[0]]: dummy });
+
             modelLoadSuccess = true;
-            console.log('[CogneeAI] ✅ Нейросеть инициализирована за ' + ms + 'мс (встроенный инференс)');
+            console.log(`[CogneeAI] ✅ ONNX загружена за ${Math.round(performance.now() - t0)}мс`);
             updateNeuralBadge('ready');
-        } else {
+        } catch (err) {
+            onnxSession      = null;
             modelLoadSuccess = false;
-            console.warn('[CogneeAI] Ошибка инициализации → эвристика');
+            console.warn('[CogneeAI] Ошибка загрузки ONNX:', err.message, '→ эвристика');
             updateNeuralBadge('fallback');
         }
     }
 
-    // ─── СЧЁТЧИК 1 — Ритм скроллинга ─────────────────────────────────────────
-    const scrollTimestamps = [];
+    // ─── СЕНСОР 1 — Скролл ───────────────────────────────────────────────────
+    const scrollTimestamps     = [];
+    let prevScrollYForSpeed    = window.scrollY;
+    let prevScrollTimeForSpeed = Date.now();
 
     window.addEventListener('scroll', () => {
-        const now = Date.now();
+        const now  = Date.now();
+        const curY = window.scrollY;
+        const dy   = curY - prevScrollYForSpeed;
+        const dt   = now - prevScrollTimeForSpeed;
+
         scrollTimestamps.push(now);
         if (scrollTimestamps.length > 15) scrollTimestamps.shift();
-        lastActivityTime = now;
+        recordInteraction();
+
+        if (dt > 0) {
+            speedSamples.push(Math.abs(dy) / dt);
+            if (speedSamples.length > 10) speedSamples.shift();
+        }
+
+        if (Math.abs(dy) >= 10 && Math.abs(dy) <= 120) microScrollCount++;
+
+        const dir = dy > 5 ? 'down' : dy < -5 ? 'up' : lastScrollDirection;
+        if (dir !== lastScrollDirection && lastScrollDirection !== 'none') directionChangeCount++;
+        lastScrollDirection = dir;
+
+        if (dy > 30) { lastForwardScrollTime = now; dwellWithoutProgressMs = 0; }
+
+        if (Math.abs(curY - lastViewportY) > 5) {
+            viewportLockSec   = 0;
+            viewportLockStart = now;
+            lastViewportY     = curY;
+        }
 
         if (scrollTimestamps.length >= 2) {
             let sum = 0;
@@ -283,9 +351,12 @@
             if (avg < 50)       scrollScore = clamp(scrollScore - 2, 0, 100);
             else if (avg > 200) scrollScore = clamp(scrollScore + 2, 0, 100);
         }
+
+        prevScrollYForSpeed    = curY;
+        prevScrollTimeForSpeed = now;
     }, { passive: true });
 
-    // ─── СЧЁТЧИК 2 — Пауза перед кликом ──────────────────────────────────────
+    // ─── СЕНСОР 2 — Клики и тачи ─────────────────────────────────────────────
     const mouseEnterTimes = new WeakMap();
 
     document.addEventListener('mouseover', e => {
@@ -294,22 +365,23 @@
     });
 
     document.addEventListener('click', e => {
+        recordInteraction();
         const el = e.target.closest('p, h2, h3');
         if (!el) return;
         const enterTime = mouseEnterTimes.get(el);
         if (!enterTime) return;
         const pause = Date.now() - enterTime;
         mouseEnterTimes.delete(el);
-        lastActivityTime = Date.now();
-
-        // Скользящее среднее паузы для вектора признаков
         recentClickPause = recentClickPause * 0.7 + pause * 0.3;
-
         if (pause > 800)                       clickScore = clamp(clickScore - 3, 0, 100);
         else if (pause >= 200 && pause <= 500) clickScore = clamp(clickScore + 1, 0, 100);
     });
 
-    // ─── СЧЁТЧИК 3 — Возвраты и перечитывания ────────────────────────────────
+    document.addEventListener('touchstart', () => { isTouchDevice = 1.0; recordInteraction(); }, { passive: true });
+    document.addEventListener('touchend',   () => { recordInteraction(); }, { passive: true });
+    document.addEventListener('keydown',    () => { isTouchDevice = 0.0; recordInteraction(); });
+
+    // ─── СЕНСОР 3 — Возвраты и idle ──────────────────────────────────────────
     const yHistory    = [];
     let timeAtBottom  = null;
     let prevScrollDir = 'down';
@@ -322,18 +394,14 @@
         if (yHistory.length >= 2) {
             const oldest = yHistory[0];
             const newest = yHistory[yHistory.length - 1];
-
             if (newest.y > oldest.y) {
                 if (!timeAtBottom) timeAtBottom = now;
                 prevScrollDir = 'down';
             } else if (newest.y < oldest.y - 100) {
                 timeAtBottom = null;
-                if (prevScrollDir === 'down') {
-                    consecutiveRereads = clamp(consecutiveRereads + 1, 0, 20);
-                }
+                if (prevScrollDir === 'down') consecutiveRereads = clamp(consecutiveRereads + 1, 0, 20);
                 prevScrollDir = 'up';
             }
-
             const delta      = oldest.y - window.scrollY;
             const longEnough = timeAtBottom && (now - timeAtBottom >= 3000);
             if (delta > 300 && longEnough) {
@@ -343,79 +411,85 @@
             }
         }
 
-        // Очистка событий возврата (окно 5 мин)
         if (now - lastReturnCleanup > 30000) {
             const cutoff = now - 5 * 60 * 1000;
-            while (returnEvents.length > 0 && returnEvents[0].time < cutoff)
-                returnEvents.shift();
+            while (returnEvents.length > 0 && returnEvents[0].time < cutoff) returnEvents.shift();
             lastReturnCleanup = now;
         }
         returnEventsInWindow = returnEvents.length;
 
-        // Idle-детектор: нет активности >45 сек → нарастает усталость
         const idleSec = (now - lastActivityTime) / 1000;
-        if (idleSec > 45 && idleSec < 120) {
-            idleBursts = clamp(idleBursts + 0.5, 0, 10);
-        }
+        if (idleSec > 45 && idleSec < 120) idleBursts = clamp(idleBursts + 0.5, 0, 10);
     }, 1000);
 
-    // Постепенное восстановление метрик при активном чтении
+    // ─── СЕНСОР 4 — Dwell, viewport lock, сброс окон ─────────────────────────
+    setInterval(() => {
+        const now  = Date.now();
+        const curY = window.scrollY;
+
+        if (now - lastForwardScrollTime > 3000) dwellWithoutProgressMs = now - lastForwardScrollTime;
+        if (Math.abs(curY - lastViewportY) <= 5) viewportLockSec = (now - viewportLockStart) / 1000;
+
+        if (now - directionWindowReset > 30000) { directionChangeCount = 0; directionWindowReset = now; }
+        if (now - lastMicroScrollReset > 60000) { microScrollCount = 0; lastMicroScrollReset = now; }
+    }, 1000);
+
+    // ─── СЕНСОР 5 — Paragraph reread (IntersectionObserver) ──────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        const blocks = document.querySelectorAll('.para-block');
+        paragraphsTracked = blocks.length;
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const idx    = Array.from(blocks).indexOf(entry.target);
+                    if (idx === -1) return;
+                    const visits = (paragraphVisits.get(idx) || 0) + 1;
+                    paragraphVisits.set(idx, visits);
+                    if (visits === 2) paragraphRereadsTotal++;
+                });
+            }, { threshold: 0.5 });
+            blocks.forEach(b => observer.observe(b));
+        }
+    });
+
+    // ─── ВОССТАНОВЛЕНИЕ ───────────────────────────────────────────────────────
     setInterval(() => {
         returnScore        = clamp(returnScore + 1, 0, 100);
         consecutiveRereads = clamp(consecutiveRereads - 0.1, 0, 20);
         idleBursts         = clamp(idleBursts - 0.2, 0, 10);
     }, 5000);
 
-    // ─── ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ КИМ ─────────────────────────────────────────
+    // ─── ГЛАВНЫЙ ЦИКЛ КИМ ─────────────────────────────────────────────────────
     const updateKIM = async () => {
-        let rawKIM;
-        let alpha;
+        let rawKIM, alpha;
 
-        if (modelLoadSuccess) {
-            // ── Встроенный инференс ──────────────────────────────────────────
-            const neuralKIM = computeKIMNeural();
-            rawKIM = (neuralKIM !== null) ? neuralKIM : computeKIMHeuristic();
+        if (modelLoadSuccess && onnxSession) {
+            const neuralKIM = await computeKIMNeural();
+            rawKIM = neuralKIM !== null ? neuralKIM : computeKIMHeuristic();
             alpha  = SMOOTH_ALPHA_NEURAL;
         } else {
-            // ── Режим эвристики (fallback) ──────────────────────────────────
             rawKIM = computeKIMHeuristic();
             alpha  = SMOOTH_ALPHA_HEURISTIC;
-            console.log(
-                `[CogneeAI ⚙] scroll:${scrollScore} click:${clickScore}` +
-                ` return:${returnScore} chrono:${getChronoBonus()} → КИМ:${rawKIM.toFixed(1)}`
-            );
+            console.log(`[CogneeAI ⚙] dwell:${Math.round(dwellWithoutProgressMs/1000)}s lock:${Math.round(viewportLockSec)}s → КИМ:${rawKIM.toFixed(1)}`);
         }
 
-        const adjusted  = clamp(rawKIM, 0, 100);
-        smoothedKIM     = Math.round((alpha * adjusted + (1 - alpha) * smoothedKIM) * 10) / 10;
+        smoothedKIM       = Math.round((alpha * clamp(rawKIM, 0, 100) + (1 - alpha) * smoothedKIM) * 10) / 10;
         window.currentKIM = smoothedKIM;
 
-        // ── Обновляем КИМ-дисплей ────────────────────────────────────────
         const display = document.getElementById('kim-display');
         if (display) {
-            const modeTag = modelLoadSuccess ? ' 🧠' : ' ⚙';
-            display.textContent = `КИМ: ${smoothedKIM}${modeTag}`;
+            display.textContent = `КИМ: ${smoothedKIM}${modelLoadSuccess ? ' 🧠' : ' ⚙'}`;
             const colors = { focus: '#4FC3F7', normal: '#81C784', tired: '#c49a6c' };
             display.style.borderLeft = `3px solid ${colors[getZone(smoothedKIM)]}`;
         }
 
-        // ── Сохраняем в localStorage ──────────────────────────────────────
-        if (window.CogneeStorage) {
-            window.CogneeStorage.saveKIM(smoothedKIM, Date.now());
-        }
+        if (window.CogneeStorage)   window.CogneeStorage.saveKIM(smoothedKIM, Date.now());
+        if (window.CogneeAnalytics) window.CogneeAnalytics.sendEvent(smoothedKIM, getZone(smoothedKIM));
 
-        // ── Supabase аналитика (EchoAnalytics v7.1+, опционально) ────────
-        if (window.EchoAnalytics) {
-            window.EchoAnalytics.sendEvent(smoothedKIM, getZone(smoothedKIM));
-        }
-
-        // ── Адаптация при значимом изменении ─────────────────────────────
         const zoneChanged = lastKIM === null || getZone(smoothedKIM) !== getZone(lastKIM);
         const bigDelta    = lastKIM !== null && Math.abs(smoothedKIM - lastKIM) >= KIM_CHANGE_THRESHOLD;
-
-        if ((zoneChanged || bigDelta) && window.applyAdaptation) {
-            window.applyAdaptation(smoothedKIM);
-        }
+        if ((zoneChanged || bigDelta) && window.applyAdaptation) window.applyAdaptation(smoothedKIM);
 
         lastKIM = smoothedKIM;
     };

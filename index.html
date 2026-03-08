@@ -1,10 +1,9 @@
-<!-- index.html — v7.2 | Глобальная версия: 7.2 -->
-<!-- Изменения v7.2:
-     - Ребрендинг: ЭхоСреда → Cognee, CogneeAI
-     - TF.js CDN удалён — нейросеть встроена в weights.js
-     - weights.js подключён первым в порядке скриптов
-     - Добавлена фавиконка favicon.ico из корня репозитория
-     - Обновлены мета-теги title и description
+<!-- index.html — v8.0 | Глобальная версия: 8.0 -->
+<!-- Изменения v8.0:
+     - Переход на ONNX Runtime Web — weights.js удалён
+     - onnxruntime-web CDN подключён вместо weights.js
+     - Модель загружается из model/cognee_ai.onnx
+     - Порядок скриптов обновлён
 -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -81,23 +80,24 @@
 
     <!--
         ══════════════════════════════════════════════════════════
-        ПОРЯДОК СКРИПТОВ v7.2 — КРИТИЧЕН, НЕ МЕНЯТЬ
+        ПОРЯДОК СКРИПТОВ v8.0 — КРИТИЧЕН, НЕ МЕНЯТЬ
         ══════════════════════════════════════════════════════════
-        1. weights.js     — веса нейросети CogneeAI (SimpleRNN 8→48→24→5)
+        1. onnxruntime-web — инференс ONNX в браузере (CDN)
                            ДОЛЖЕН быть ДО sensor.js
         2. storage.js     — localStorage профиль
                            ДОЛЖЕН быть ДО sensor.js
-        3. sensor.js      — вычисление КИМ (встроенный JS инференс CogneeAI)
+        3. sensor.js      — КИМ + 16 сенсоров + ONNX инференс
                            ДОЛЖЕН быть ДО adapter.js
         4. adapter.js     — адаптация контента
                            ДОЛЖЕН быть ПОСЛЕ sensor.js
         ──────────────────────────────────────────────────────────
-        Будущие подключения (раскомментировать по мере готовности):
+        Модель: model/cognee_ai.onnx (переобучить → заменить файл)
+        Будущие подключения:
         5. analytics.js   — Supabase телеметрия
         6. cognee.js      — универсальный SDK
         ══════════════════════════════════════════════════════════
     -->
-    <script src="weights.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
     <script src="storage.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
