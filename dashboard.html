@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ЭхоСреда — Твой когнитивный профиль</title>
+    <title>Cognee — Твой когнитивный профиль</title>
     <style>
         /* ─── ПЕРЕМЕННЫЕ ─────────────────────────────────────────────────────── */
         :root {
@@ -268,7 +268,7 @@
 <div class="dash-header">
     <div class="dash-title">
         Твой когнитивный профиль
-        <span>ЭхоСреда · локальная аналитика · v5.0</span>
+        <span>Cognee · локальная аналитика · v5.0</span>
     </div>
     <a class="dash-back" href="index.html">← Вернуться к статье</a>
 </div>
@@ -378,7 +378,7 @@
     function render() {
 
         // Проверяем наличие storage.js
-        if (!window.EchoStorage) {
+        if (!window.CogneeStorage) {
             container.innerHTML = `
                 <div class="chart-card">
                     <div class="placeholder">
@@ -393,7 +393,7 @@
             return;
         }
 
-        const history = window.EchoStorage.getHistory();
+        const history = window.CogneeStorage.getHistory();
 
         // ── Нет данных ──────────────────────────────────────────────────────
         if (history.length === 0) {
@@ -410,10 +410,10 @@
             return;
         }
 
-        const hourly = window.EchoStorage.getHourlyStats();
-        const daily  = window.EchoStorage.getDailyStats();
-        const bestH  = window.EchoStorage.getBestHour();
-        const worstH = window.EchoStorage.getWorstHour();
+        const hourly = window.CogneeStorage.getHourlyStats();
+        const daily  = window.CogneeStorage.getDailyStats();
+        const bestH  = window.CogneeStorage.getBestHour();
+        const worstH = window.CogneeStorage.getWorstHour();
         const total  = history.length;
         const avgKIM = Math.round(
             history.reduce((s, r) => s + r.kim, 0) / total * 10
@@ -507,7 +507,7 @@
         // Кнопка очистки
         document.getElementById('reset-btn').addEventListener('click', () => {
             if (confirm('Удалить всю историю КИМ?\nЭто действие нельзя отменить.')) {
-                localStorage.removeItem('echo_kim_history');
+                localStorage.removeItem('cognee_kim_history');
                 render();
             }
         });

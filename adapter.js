@@ -1,6 +1,5 @@
-
-// adapter.js — v4.0
-// Файл: adapter.js | Глобальная версия: 5.0 (файл не изменялся с v4.0)
+// adapter.js — v7.2
+// Файл: adapter.js | Глобальная версия: 7.2
 // Исправления v4.0:
 // 1. КИМ-дисплей и кнопка темы больше не перекрываются (кнопка сдвинута)
 // 2. Пауза — полноэкранный оверлей с обратным отсчётом и кнопкой «Вернуться»
@@ -74,7 +73,7 @@
     // ─── ПРОГРЕСС-БАР ────────────────────────────────────────────────────────
     function initProgressBar() {
         const bar = document.createElement('div');
-        bar.id = 'echo-progress-bar';
+        bar.id = 'cognee-progress-bar';
         bar.style.cssText = `
             position:fixed; left:0; top:0; width:3px; height:0%;
             background:linear-gradient(180deg,#4FC3F7,#7C4DFF);
@@ -85,7 +84,7 @@
     }
 
     function updateProgressBar() {
-        const bar = document.getElementById('echo-progress-bar');
+        const bar = document.getElementById('cognee-progress-bar');
         if (!bar) return;
         const docH = document.documentElement.scrollHeight - window.innerHeight;
         if (docH <= 0) { bar.style.height = '0%'; return; }
@@ -180,7 +179,7 @@
     // ─── РУЧНОЙ ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМОВ ─────────────────────────────────────────
     function initModeSwitcher() {
         const panel = document.createElement('div');
-        panel.id = 'echo-mode-switcher';
+        panel.id = 'cognee-mode-switcher';
         panel.style.cssText = `
             position:fixed; bottom:24px; left:24px;
             display:flex; flex-direction:column; gap:6px; z-index:10001;
@@ -241,7 +240,7 @@
     // ─── ПЕРЕКЛЮЧАТЕЛЬ ТЕМЫ ───────────────────────────────────────────────────
     function initThemeToggle() {
         const btn = document.createElement('button');
-        btn.id = 'echo-theme-toggle';
+        btn.id = 'cognee-theme-toggle';
         btn.textContent = '☀';
         btn.title = 'Переключить тему';
         btn.style.cssText = `
@@ -259,7 +258,7 @@
     function toggleTheme() {
         currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
         document.body.dataset.theme = currentTheme;
-        const btn = document.getElementById('echo-theme-toggle');
+        const btn = document.getElementById('cognee-theme-toggle');
         if (btn) btn.textContent = currentTheme === 'dark' ? '☀' : '🌙';
     }
 
@@ -411,10 +410,10 @@
     };
 
     function showModeHint(mode, kim) {
-        let hint = document.getElementById('echo-mode-hint');
+        let hint = document.getElementById('cognee-mode-hint');
         if (!hint) {
             hint = document.createElement('div');
-            hint.id = 'echo-mode-hint';
+            hint.id = 'cognee-mode-hint';
             hint.style.cssText = `
                 position:fixed; top:64px; left:50%;
                 transform:translateX(-50%) translateY(-10px);
@@ -520,9 +519,8 @@
                 if (after) frag.appendChild(document.createTextNode(after));
 
                 textNode.parentNode.replaceChild(frag, textNode);
-        
-            });
-        });
-    }
+            });        // конец textNodes.forEach
+        });            // конец paras.forEach
+    }                  // конец highlightKeywords
 
-})();
+})();                  // конец IIFE

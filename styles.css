@@ -1,9 +1,11 @@
 /* ═══════════════════════════════════════════════════════════
-   ЭхоСреда — styles.css v5.0
-   Файл: styles.css | Глобальная версия: 5.0
-   Изменения v5.0:
-   - Добавлены стили ссылки #dash-link (иконка перехода на дашборд)
-   - Остальное без изменений относительно v4.0
+   Cognee — styles.css v7.2
+   Файл: styles.css | Глобальная версия: 7.2
+   Изменения v7.2:
+   - Ребрендинг: ЭхоСреда → Cognee
+   - echo-progress-bar → cognee-progress-bar
+   - echo-theme-toggle → cognee-theme-toggle
+   - echo-mode-hint → cognee-mode-hint
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── CSS-ПЕРЕМЕННЫЕ: ТЁМНАЯ ТЕМА (по умолчанию) ─────────────────────────── */
@@ -364,16 +366,16 @@ body.mode-tired h2 {
 }
 
 /* ─── КНОПКА ТЕМЫ ────────────────────────────────────────────────────────── */
-#echo-theme-toggle:hover {
+#cognee-theme-toggle:hover {
     background: rgba(255,255,255,0.1) !important;
 }
 
-[data-theme="light"] #echo-theme-toggle {
+[data-theme="light"] #cognee-theme-toggle {
     color: #4a3f35 !important;
     border-color: rgba(0,0,0,0.2) !important;
 }
 
-[data-theme="light"] #echo-theme-toggle:hover {
+[data-theme="light"] #cognee-theme-toggle:hover {
     background: rgba(0,0,0,0.08) !important;
 }
 

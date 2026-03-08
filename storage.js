@@ -1,10 +1,10 @@
-// storage.js — v5.0
-// Файл: storage.js | Глобальная версия: 5.0
+// storage.js — v7.2
+// Файл: storage.js | Глобальная версия: 7.2
 // Хранение истории КИМ в localStorage между сессиями.
-// Экспортирует window.EchoStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour }
+// Экспортирует window.CogneeStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour }
 
 (function () {
-    const STORAGE_KEY = 'echo_kim_history';
+    const STORAGE_KEY = 'cognee_kim_history';
     const MAX_RECORDS = 500;
 
     /**
@@ -24,7 +24,7 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
         } catch (e) {
             // localStorage может быть заблокирован (приватный режим и т.д.)
-            console.warn('[EchoStorage] Не удалось сохранить КИМ:', e);
+            console.warn('[CogneeStorage] Не удалось сохранить КИМ:', e);
         }
     }
 
@@ -113,7 +113,7 @@
     }
 
     // ─── ЭКСПОРТ ─────────────────────────────────────────────────────────────
-    window.EchoStorage = {
+    window.CogneeStorage = {
         saveKIM,
         getHistory,
         getHourlyStats,
@@ -122,5 +122,5 @@
         getWorstHour,
     };
 
-    console.log('[EchoStorage v5.0] Загружен. Записей в истории:', _load().length);
+    console.log('[CogneeStorage v7.2] Загружен. Записей в истории:', _load().length);
 })();
