@@ -1,7 +1,8 @@
-// storage.js — v7.2
-// Файл: storage.js | Глобальная версия: 7.2
+// storage.js — v8.1
+// Файл: storage.js | Глобальная версия: 8.1
 // Хранение истории КИМ в localStorage между сессиями.
-// Экспортирует window.CogneeStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour }
+// Блок 1 (v8.1): добавлен кэш AI-упрощений и AI-ключевых слов (экономия лимитов Gemini Flash).
+// Экспортирует window.CogneeStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour, saveSimplified, getSimplified, saveKeywords, getKeywords }
 
 (function () {
     const STORAGE_KEY = 'cognee_kim_history';
@@ -112,6 +113,83 @@
         return 'tired';
     }
 
+    // ─── КЭШ AI-УПРОЩЕНИЙ ────────────────────────────────────────────────────
+    const SIMPLIFIED_KEY = 'cognee_ai_simplified';
+    const KEYWORDS_KEY   = 'cognee_ai_keywords';
+    const MAX_CACHE      = 200; // максимум кэшированных абзацев
+
+    /**
+     * Сохраняет AI-упрощённую версию абзаца по его хэшу.
+     * @param {string} hash — идентификатор текста (первые 80 символов)
+     * @param {string} simplified — упрощённый текст от Gemini
+     */
+    function saveSimplified(hash, simplified) {
+        try {
+            const cache = _loadCache(SIMPLIFIED_KEY);
+            cache[hash] = simplified;
+            const keys = Object.keys(cache);
+            // Удаляем самые старые если превысили лимит
+            if (keys.length > MAX_CACHE) {
+                const toDelete = keys.slice(0, keys.length - MAX_CACHE);
+                toDelete.forEach(k => delete cache[k]);
+            }
+            localStorage.setItem(SIMPLIFIED_KEY, JSON.stringify(cache));
+        } catch (e) {
+            console.warn('[CogneeStorage] Не удалось сохранить AI-упрощение:', e);
+        }
+    }
+
+    /**
+     * Возвращает кэшированное AI-упрощение абзаца.
+     * @param {string} hash — идентификатор текста
+     * @returns {string|null} — упрощённый текст или null если нет в кэше
+     */
+    function getSimplified(hash) {
+        const cache = _loadCache(SIMPLIFIED_KEY);
+        return cache[hash] || null;
+    }
+
+    /**
+     * Сохраняет AI-ключевые слова для абзаца.
+     * @param {string} hash — идентификатор текста
+     * @param {string[]} keywords — массив ключевых слов
+     */
+    function saveKeywords(hash, keywords) {
+        try {
+            const cache = _loadCache(KEYWORDS_KEY);
+            cache[hash] = keywords;
+            const keys = Object.keys(cache);
+            if (keys.length > MAX_CACHE) {
+                const toDelete = keys.slice(0, keys.length - MAX_CACHE);
+                toDelete.forEach(k => delete cache[k]);
+            }
+            localStorage.setItem(KEYWORDS_KEY, JSON.stringify(cache));
+        } catch (e) {
+            console.warn('[CogneeStorage] Не удалось сохранить ключевые слова:', e);
+        }
+    }
+
+    /**
+     * Возвращает кэшированные ключевые слова для абзаца.
+     * @param {string} hash — идентификатор текста
+     * @returns {string[]|null}
+     */
+    function getKeywords(hash) {
+        const cache = _loadCache(KEYWORDS_KEY);
+        return cache[hash] || null;
+    }
+
+    function _loadCache(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
     // ─── ЭКСПОРТ ─────────────────────────────────────────────────────────────
     window.CogneeStorage = {
         saveKIM,
@@ -120,7 +198,11 @@
         getDailyStats,
         getBestHour,
         getWorstHour,
+        saveSimplified,
+        getSimplified,
+        saveKeywords,
+        getKeywords,
     };
 
-    console.log('[CogneeStorage v7.2] Загружен. Записей в истории:', _load().length);
+    console.log('[CogneeStorage v8.1] Загружен. Записей в истории:', _load().length);
 })();

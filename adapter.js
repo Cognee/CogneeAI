@@ -1,6 +1,11 @@
-// adapter.js — v7.2
-// Файл: adapter.js | Глобальная версия: 7.2
-// Исправления v4.0:
+// adapter.js — v8.1
+// Файл: adapter.js | Глобальная версия: 8.1
+// Блок 1 (v8.1): интеграция CogneeAI (Gemini Flash)
+// - Режим tired: AI-упрощение абзацев, если нет готовой para-simple
+// - Режим normal/tired: AI-выделение ключевых слов
+// - Спиннер и статус AI в UI
+// - Graceful fallback если Gemini недоступен
+// Предыдущие изменения v4.0:
 // 1. КИМ-дисплей и кнопка темы больше не перекрываются (кнопка сдвинута)
 // 2. Пауза — полноэкранный оверлей с обратным отсчётом и кнопкой «Вернуться»
 //    Нажатие «Вернуться» = ручное переключение на норму (КИМ = нижняя граница нормы)
@@ -198,7 +203,7 @@
                 background:${color}22; color:${color};
                 border:1px solid ${color}66; border-radius:20px;
                 padding:5px 12px; font-size:12px; font-weight:600;
-                font-family:'Courier New',monospace; cursor:pointer;
+                font-family:'JetBrains Mono','Courier New',monospace; cursor:pointer;
                 transition:background 0.2s ease, transform 0.1s ease;
                 white-space:nowrap;
             `;
@@ -289,7 +294,19 @@
 
         updateContentByMode(newMode);
 
-        if (newMode !== lastMode) showModeHint(newMode, kim);
+        if (newMode !== lastMode) {
+            showModeHint(newMode, kim);
+
+            // ── AI-адаптация при первом входе в режим ────────────────────────
+            if (newMode === 'tired') {
+                // Запрашиваем AI-упрощение для блоков без готовой para-simple
+                triggerAISimplification();
+            }
+            if (newMode === 'normal' || newMode === 'tired') {
+                // AI-выделение ключевых слов
+                triggerAIKeywords();
+            }
+        }
 
         if (newMode === 'tired') handleTiredMode();
         else clearTiredMode();
@@ -483,7 +500,7 @@
         if (activePara) activePara.classList.add('active-para');
     }
 
-    // ─── ПОДСВЕТКА КЛЮЧЕВЫХ СЛОВ ──────────────────────────────────────────────
+    // ─── ПОДСВЕТКА КЛЮЧЕВЫХ СЛОВ (локальный fallback) ────────────────────────
     function highlightKeywords() {
         const wordRe = /[\u0400-\u04FFa-zA-Z]{9,}/g;
         const paras  = document.querySelectorAll('.para-full');
@@ -519,8 +536,180 @@
                 if (after) frag.appendChild(document.createTextNode(after));
 
                 textNode.parentNode.replaceChild(frag, textNode);
-            });        // конец textNodes.forEach
-        });            // конец paras.forEach
-    }                  // конец highlightKeywords
+            });
+        });
+    }
 
-})();                  // конец IIFE
+    // ─── AI-УПРОЩЕНИЕ АБЗАЦЕВ ────────────────────────────────────────────────
+    /**
+     * Для каждого блока без готовой para-simple запрашивает AI-упрощение.
+     * Показывает спиннер пока идёт загрузка.
+     */
+    async function triggerAISimplification() {
+        if (!window.CogneeAI) return; // gemini.js не загружен
+
+        const blocks = Array.from(document.querySelectorAll('.para-block'));
+        const needAI = blocks.filter(block => {
+            const simple = block.querySelector('.para-simple');
+            // Нужен AI если нет simple-абзаца или он пустой
+            return !simple || simple.textContent.trim().length < 10;
+        });
+
+        if (needAI.length === 0) return;
+
+        showAIStatus(`⚡ CogneeAI упрощает ${needAI.length} абзац(ев)…`);
+
+        let done = 0;
+        for (const block of needAI) {
+            const full = block.querySelector('.para-full');
+            if (!full) continue;
+
+            showAISpinner(block);
+
+            try {
+                const simplified = await window.CogneeAI.simplifyParagraph(full.textContent);
+                injectSimplified(block, simplified);
+            } catch (e) {
+                console.warn('[adapter.js] AI-упрощение не удалось:', e);
+            }
+
+            hideAISpinner(block);
+            done++;
+            showAIStatus(`⚡ CogneeAI: ${done}/${needAI.length} абзацев обработано`);
+        }
+
+        hideAIStatus(2000);
+    }
+
+    /** Вставляет упрощённый текст в блок (или обновляет существующий) */
+    function injectSimplified(block, text) {
+        let simple = block.querySelector('.para-simple');
+        if (!simple) {
+            simple = document.createElement('p');
+            simple.className = 'para-simple';
+            block.appendChild(simple);
+        }
+        simple.textContent = text;
+
+        // Если сейчас активен режим tired — показываем упрощение
+        if (lastMode === 'tired') {
+            const full = block.querySelector('.para-full');
+            if (full && block.dataset.showing !== 'simple') {
+                animateContentSwap(block, full, simple, true);
+            }
+        }
+    }
+
+    // ─── AI-КЛЮЧЕВЫЕ СЛОВА ────────────────────────────────────────────────────
+    /**
+     * Заменяет локальный highlightKeywords на AI-версию от Gemini.
+     * Работает для режимов normal и tired.
+     */
+    async function triggerAIKeywords() {
+        if (!window.CogneeAI) {
+            // fallback — локальный алгоритм
+            highlightKeywords();
+            return;
+        }
+
+        // Снимаем старые подсветки
+        document.querySelectorAll('.keyword').forEach(span => {
+            span.outerHTML = span.textContent;
+        });
+
+        const paras = Array.from(document.querySelectorAll('.para-full'));
+
+        for (const para of paras) {
+            try {
+                const keywords = await window.CogneeAI.extractKeywords(para.textContent);
+                if (keywords.length > 0) {
+                    highlightWordsInPara(para, keywords);
+                }
+            } catch (e) {
+                // тихий fallback
+            }
+        }
+    }
+
+    /**
+     * Подсвечивает слова из массива keywords в абзаце para.
+     * @param {HTMLElement} para
+     * @param {string[]} keywords
+     */
+    function highlightWordsInPara(para, keywords) {
+        const walker = document.createTreeWalker(para, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+        let node;
+        while ((node = walker.nextNode())) textNodes.push(node);
+
+        textNodes.forEach(textNode => {
+            let text = textNode.nodeValue;
+            let modified = false;
+            const frag = document.createDocumentFragment();
+
+            // Ищем вхождения каждого ключевого слова
+            let remaining = text;
+            let lastIdx   = 0;
+
+            keywords.forEach(kw => {
+                if (kw.length < 3) return;
+                const re  = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                const hit = re.exec(remaining);
+                if (hit) {
+                    const before = remaining.slice(0, hit.index);
+                    const after  = remaining.slice(hit.index + hit[0].length);
+
+                    if (before) frag.appendChild(document.createTextNode(before));
+                    const span = document.createElement('span');
+                    span.className   = 'keyword keyword-ai';
+                    span.textContent = hit[0];
+                    frag.appendChild(span);
+
+                    remaining = after;
+                    modified  = true;
+                }
+            });
+
+            if (modified) {
+                if (remaining) frag.appendChild(document.createTextNode(remaining));
+                textNode.parentNode.replaceChild(frag, textNode);
+            }
+        });
+    }
+
+    // ─── UI: СПИННЕР И СТАТУС AI ──────────────────────────────────────────────
+    let aiStatusTimer = null;
+
+    function showAIStatus(text) {
+        let el = document.getElementById('cognee-ai-status');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'cognee-ai-status';
+            document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.classList.add('visible');
+        clearTimeout(aiStatusTimer);
+    }
+
+    function hideAIStatus(delay = 0) {
+        aiStatusTimer = setTimeout(() => {
+            const el = document.getElementById('cognee-ai-status');
+            if (el) el.classList.remove('visible');
+        }, delay);
+    }
+
+    function showAISpinner(block) {
+        if (block.querySelector('.cognee-ai-spinner')) return;
+        const spinner = document.createElement('div');
+        spinner.className = 'cognee-ai-spinner';
+        spinner.innerHTML = '<span></span><span></span><span></span>';
+        block.appendChild(spinner);
+    }
+
+    function hideAISpinner(block) {
+        const spinner = block.querySelector('.cognee-ai-spinner');
+        if (spinner) spinner.remove();
+    }
+
+})();
