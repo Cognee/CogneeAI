@@ -1,9 +1,9 @@
-<!-- index.html — v8.0 | Глобальная версия: 8.0 -->
-<!-- Изменения v8.0:
-     - Переход на ONNX Runtime Web — weights.js удалён
-     - onnxruntime-web CDN подключён вместо weights.js
-     - Модель загружается из model/cognee_ai.onnx
-     - Порядок скриптов обновлён
+<!-- index.html — v8.1 | Глобальная версия: 8.1 -->
+<!-- Изменения v8.1:
+     - Добавлен favicon (папка /favicon/)
+     - Подключён gemini.js (AI-адаптация текста, Блок 1)
+     - Подключён config.js (API-ключ Gemini задаётся там)
+     - Шрифты Google Fonts: Lora + JetBrains Mono
 -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -12,7 +12,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Cognee — адаптивная подача контента по поведению пользователя. Нейросеть CogneeAI прямо в браузере.">
     <title>Cognee — демо</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
+
+    <!-- Шрифты -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="styles.css">
 </head>
 <!-- data-theme="dark" по умолчанию; adapter.js переключает на "light" -->
@@ -80,25 +92,33 @@
 
     <!--
         ══════════════════════════════════════════════════════════
-        ПОРЯДОК СКРИПТОВ v8.0 — КРИТИЧЕН, НЕ МЕНЯТЬ
+        ПОРЯДОК СКРИПТОВ v8.1 — КРИТИЧЕН, НЕ МЕНЯТЬ
         ══════════════════════════════════════════════════════════
-        1. onnxruntime-web — инференс ONNX в браузере (CDN)
-                           ДОЛЖЕН быть ДО sensor.js
-        2. storage.js     — localStorage профиль
-                           ДОЛЖЕН быть ДО sensor.js
-        3. sensor.js      — КИМ + 16 сенсоров + ONNX инференс
-                           ДОЛЖЕН быть ДО adapter.js
-        4. adapter.js     — адаптация контента
-                           ДОЛЖЕН быть ПОСЛЕ sensor.js
+        1. onnxruntime-web  — инференс ONNX в браузере (CDN)
+                             ДОЛЖЕН быть ДО sensor.js
+        2. config.js        — API-ключ Gemini (COGNEE_GEMINI_KEY)
+                             Создай этот файл сам, см. ниже
+        3. storage.js       — localStorage профиль + AI-кэш
+                             ДОЛЖЕН быть ДО sensor.js и gemini.js
+        4. gemini.js        — AI-адаптация через Gemini Flash
+                             ДОЛЖЕН быть ДО adapter.js
+        5. sensor.js        — КИМ + 16 сенсоров + ONNX инференс
+                             ДОЛЖЕН быть ДО adapter.js
+        6. adapter.js       — адаптация контента + AI-интеграция
         ──────────────────────────────────────────────────────────
-        Модель: model/cognee_ai.onnx (переобучить → заменить файл)
-        Будущие подключения:
-        5. analytics.js   — Supabase телеметрия
-        6. cognee.js      — универсальный SDK
+        Модель: model/cognee_ai.onnx
+
+        КАК СОЗДАТЬ config.js:
+        Создай файл config.js в корне проекта:
+            // config.js — НЕ КОММИТЬ В GIT (добавь в .gitignore)
+            window.COGNEE_GEMINI_KEY = 'твой_ключ_из_aistudio.google.com';
+        Получи ключ бесплатно: https://aistudio.google.com/app/apikey
         ══════════════════════════════════════════════════════════
     -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+    <script src="config.js" onerror="console.warn('[Cognee] config.js не найден — AI-фичи недоступны. Создай файл с window.COGNEE_GEMINI_KEY')"></script>
     <script src="storage.js"></script>
+    <script src="gemini.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
     <!-- <script src="analytics.js"></script> -->
