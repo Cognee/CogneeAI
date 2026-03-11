@@ -1,2 +1,0 @@
-
-window.COGNEE_GEMINI_KEY = 'AIzaSyDMv9KgZHTGZm1S4LoieGsac9ehMrAYMJg';
