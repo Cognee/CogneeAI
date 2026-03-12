@@ -1,9 +1,9 @@
-<!-- index.html — v8.1 | Глобальная версия: 8.1 -->
-<!-- Изменения v8.1:
-     - Добавлен favicon (папка /favicon/)
-     - Подключён gemini.js (AI-адаптация текста, Блок 1)
-     - Подключён config.js (API-ключ Gemini задаётся там)
-     - Шрифты Google Fonts: Lora + JetBrains Mono
+<!-- index.html — v8.2 | Глобальная версия: 8.2 -->
+<!-- Изменения v8.2:
+     - Добавлена ссылка на profile.html (иконка 👤 рядом с дашбордом)
+     - Добавлен supabase.js в порядок скриптов (между storage.js и gemini.js)
+     - Favicon переведён на relative paths (исправление GitHub Pages)
+     - Комментарий обновлён: описание прокси
 -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -13,12 +13,13 @@
     <meta name="description" content="Cognee — адаптивная подача контента по поведению пользователя. Нейросеть CogneeAI прямо в браузере.">
     <title>Cognee — демо</title>
 
-    <!-- Favicon -->
-<link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
-<link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
-<link rel="shortcut icon" href="favicon/favicon.ico" />
-<link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
-<link rel="manifest" href="favicon/site.webmanifest" />
+    <!-- Favicon (relative paths для GitHub Pages subdirectory) -->
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="favicon/site.webmanifest" />
+
     <!-- Шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +35,9 @@
 
     <!-- Ссылка на хронокогнитивный дашборд -->
     <a id="dash-link" href="dashboard.html" title="Твой когнитивный профиль">📊</a>
+
+    <!-- Ссылка на профиль (Блок 2) -->
+    <a id="profile-link" href="profile.html" title="Профиль и синхронизация">👤</a>
 
     <div class="article">
         <main>
@@ -91,35 +95,50 @@
 
     <!--
         ══════════════════════════════════════════════════════════
-        ПОРЯДОК СКРИПТОВ v8.1 — КРИТИЧЕН, НЕ МЕНЯТЬ
+        ПОРЯДОК СКРИПТОВ v8.2 — КРИТИЧЕН, НЕ МЕНЯТЬ
         ══════════════════════════════════════════════════════════
         1. onnxruntime-web  — инференс ONNX в браузере (CDN)
-                             ДОЛЖЕН быть ДО sensor.js
-        2. config.js        — API-ключ Gemini (COGNEE_GEMINI_KEY)
-                             Создай этот файл сам, см. ниже
+        2. config.js        — ключи: COGNEE_GEMINI_KEY, COGNEE_SUPABASE_URL,
+                               COGNEE_SUPABASE_KEY, COGNEE_GEMINI_PROXY_URL
         3. storage.js       — localStorage профиль + AI-кэш
-                             ДОЛЖЕН быть ДО sensor.js и gemini.js
-        4. gemini.js        — AI-адаптация через Gemini Flash
-                             ДОЛЖЕН быть ДО adapter.js
-        5. sensor.js        — КИМ + 16 сенсоров + ONNX инференс
-                             ДОЛЖЕН быть ДО adapter.js
-        6. adapter.js       — адаптация контента + AI-интеграция
+        4. supabase.js      — Блок 2: авторизация и облачная синхронизация
+        5. gemini.js        — AI-адаптация (прокси или прямой ключ)
+        6. sensor.js        — КИМ + 16 сенсоров + ONNX инференс
+        7. adapter.js       — адаптация контента + AI-интеграция
         ──────────────────────────────────────────────────────────
         Модель: model/cognee_ai.onnx
 
-        КАК СОЗДАТЬ config.js:
-        Создай файл config.js в корне проекта:
-            // config.js — НЕ КОММИТЬ В GIT (добавь в .gitignore)
-            window.COGNEE_GEMINI_KEY = 'твой_ключ_из_aistudio.google.com';
-        Получи ключ бесплатно: https://aistudio.google.com/app/apikey
+        КАК СОЗДАТЬ config.js (скопировать config.example.js):
+        Скопируй config.example.js → config.js и заполни ключи.
+        НЕ КОММИТЬ config.js в Git!
         ══════════════════════════════════════════════════════════
     -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
-    <script src="config.js" onerror="console.warn('[Cognee] config.js не найден — AI-фичи недоступны. Создай файл с window.COGNEE_GEMINI_KEY')"></script>
+    <script src="config.js" onerror="console.warn('[Cognee] config.js не найден — создай его из config.example.js')"></script>
     <script src="storage.js"></script>
+    <script src="supabase.js"></script>
     <script src="gemini.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
     <!-- <script src="analytics.js"></script> -->
+
+    <!-- Блок 2: инициализируем Supabase и показываем статус авторизации -->
+    <script>
+        (async function () {
+            if (!window.CogneeSupabase) return;
+            if (!window.COGNEE_SUPABASE_URL || !window.COGNEE_SUPABASE_KEY) return;
+
+            const ok = await CogneeSupabase.init();
+
+            if (ok) {
+                const user = CogneeSupabase.getUser();
+                const link = document.getElementById('profile-link');
+                if (link && user) {
+                    link.title = user.display_name || user.email || 'Профиль';
+                    link.textContent = '👤';
+                }
+            }
+        })();
+    </script>
 </body>
 </html>
