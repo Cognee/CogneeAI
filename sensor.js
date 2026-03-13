@@ -1,5 +1,6 @@
-// sensor.js — v8.0
-// Файл: sensor.js | Глобальная версия: 8.0
+
+// sensor.js — v8.3
+// Файл: sensor.js | Глобальная версия: 8.3
 // Изменения v8.0 (16 признаков + ONNX инференс):
 //   - Вектор признаков расширен с 8 до 16
 //   - Новые сенсоры: dwell_without_progress, micro_scroll_corrections,
@@ -287,6 +288,8 @@
             const url = new URL(MODEL_PATH, window.location.href).href;
             console.log('[CogneeAI] Загружаю ONNX:', url);
 
+            // numThreads: 1 — GitHub Pages не поддерживает crossOriginIsolated
+            ort.env.wasm.numThreads = 1;
             onnxSession = await ort.InferenceSession.create(url, {
                 executionProviders: ['wasm'],
                 graphOptimizationLevel: 'all',
@@ -466,39 +469,67 @@
 
         if (modelLoadSuccess && onnxSession) {
             const neuralKIM = await computeKIMNeural();
-            rawKIM = neuralKIM !== null ? neuralKIM : computeKIMHeuristic();
-            alpha  = SMOOTH_ALPHA_NEURAL;
+            if (typeof neuralKIM === 'number' && !isNaN(neuralKIM)) {
+                rawKIM = neuralKIM;
+                alpha  = SMOOTH_ALPHA_NEURAL;
+            } else {
+                rawKIM = computeKIMHeuristic();
+                alpha  = SMOOTH_ALPHA_HEURISTIC;
+            }
         } else {
             rawKIM = computeKIMHeuristic();
             alpha  = SMOOTH_ALPHA_HEURISTIC;
-            console.log(`[CogneeAI ⚙] dwell:${Math.round(dwellWithoutProgressMs/1000)}s lock:${Math.round(viewportLockSec)}s → КИМ:${rawKIM.toFixed(1)}`);
         }
 
-        smoothedKIM       = Math.round((alpha * clamp(rawKIM, 0, 100) + (1 - alpha) * smoothedKIM) * 10) / 10;
+        const prevKIM = smoothedKIM;
+        smoothedKIM   = clamp(alpha * rawKIM + (1 - alpha) * smoothedKIM, 0, 100);
         window.currentKIM = smoothedKIM;
 
-        const display = document.getElementById('kim-display');
-        if (display) {
-            display.textContent = `КИМ: ${smoothedKIM}${modelLoadSuccess ? ' 🧠' : ' ⚙'}`;
-            const colors = { focus: '#4FC3F7', normal: '#81C784', tired: '#c49a6c' };
-            display.style.borderLeft = `3px solid ${colors[getZone(smoothedKIM)]}`;
+        const zone = getZone(smoothedKIM);
+
+        // Обновляем КИМ-дисплей
+        const kimEl = document.getElementById('kim-display');
+        if (kimEl) {
+            const badge = modelLoadSuccess ? '🧠' : '⚙';
+            const label = zone === 'focus' ? 'Фокус' : zone === 'normal' ? 'Норма' : 'Устал';
+            kimEl.textContent = `КИМ: ${Math.round(smoothedKIM)} · ${label} ${badge}`;
+            kimEl.style.borderLeftColor =
+                zone === 'focus'  ? '#4FC3F7' :
+                zone === 'normal' ? '#81C784' : '#FFB74D';
         }
 
-        if (window.CogneeStorage)   window.CogneeStorage.saveKIM(smoothedKIM, Date.now());
-        if (window.CogneeAnalytics) window.CogneeAnalytics.sendEvent(smoothedKIM, getZone(smoothedKIM));
+        // Сохраняем в storage
+        if (window.CogneeStorage) {
+            window.CogneeStorage.saveKIM(smoothedKIM, zone);
+        }
 
-        const zoneChanged = lastKIM === null || getZone(smoothedKIM) !== getZone(lastKIM);
-        const bigDelta    = lastKIM !== null && Math.abs(smoothedKIM - lastKIM) >= KIM_CHANGE_THRESHOLD;
-        if ((zoneChanged || bigDelta) && window.applyAdaptation) window.applyAdaptation(smoothedKIM);
+        // Синхронизируем с облаком раз в 20 циклов (~7 минут)
+        if (window.CogneeSupabase && window.CogneeSupabase.isAuthenticated()) {
+            if (!window._kimSyncCounter) window._kimSyncCounter = 0;
+            window._kimSyncCounter++;
+            if (window._kimSyncCounter % 20 === 0) {
+                window.CogneeSupabase.saveKIMRemote(
+                    smoothedKIM, zone, buildFeatureVector()
+                ).catch(() => {});
+            }
+        }
 
-        lastKIM = smoothedKIM;
+        // Диспатч события для adapter.js
+        if (Math.abs(smoothedKIM - prevKIM) >= KIM_CHANGE_THRESHOLD || lastKIM === null) {
+            lastKIM = smoothedKIM;
+            window.dispatchEvent(new CustomEvent('cognee:kim', {
+                detail: { kim: smoothedKIM, zone, features: buildFeatureVector() }
+            }));
+        }
+
+        // Analytics hook
+        if (window.CogneeAnalytics) {
+            window.CogneeAnalytics.sendEvent(smoothedKIM, zone);
+        }
     };
 
-    // ─── СТАРТ ────────────────────────────────────────────────────────────────
-    (async () => {
-        await tryLoadModel();
-        setTimeout(updateKIM, 800);
-        setInterval(updateKIM, UPDATE_INTERVAL_MS);
-    })();
+    setInterval(updateKIM, UPDATE_INTERVAL_MS);
+    updateKIM();
+    tryLoadModel();
 
 })();
