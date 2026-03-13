@@ -1,6 +1,5 @@
-
-// supabase.js — v8.3
-// Файл: supabase.js | Глобальная версия: 8.3
+// supabase.js — v8.3.2
+// Файл: supabase.js | Глобальная версия: 8.3.2
 // Блок 2+3: Авторизация и база данных через Supabase.
 // Отвечает за: аутентификацию, синхронизацию КИМ-истории, профиль, публикацию статей.
 // Изменения v8.3: добавлены publishArticle, getArticleById, getUserArticles
@@ -41,7 +40,7 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser = verified;
-                        console.log('[CogneeSupabase v8.2] Сессия восстановлена:', currentUser.email);
+                        console.log('[CogneeSupabase v8.3.2] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
                         return true;
                     }
@@ -51,7 +50,7 @@
             localStorage.removeItem('cognee_session');
         }
 
-        console.log('[CogneeSupabase v8.2] Инициализирован. Пользователь не авторизован.');
+        console.log('[CogneeSupabase v8.3.2] Инициализирован. Пользователь не авторизован.');
         return false;
     }
 
@@ -87,8 +86,11 @@
         currentUser = _extractUser(res);
         _dispatchAuthEvent('signed_in', currentUser);
 
+        // Планируем фоновое обновление токена через 50 минут
+        setTimeout(() => _refreshToken(), 50 * 60 * 1000);
+
         // После входа — синхронизируем историю КИМ
-        syncKIMHistory().catch(err => console.warn('[CogneeSupabase] Ошибка синхронизации КИМ:', err));
+        syncKIMHistory().catch(err => console.warn('[CogneeSupabase v8.3.2] Ошибка синхронизации КИМ:', err));
 
         return currentUser;
     }
@@ -105,7 +107,7 @@
 
         _clearSession();
         _dispatchAuthEvent('signed_out', null);
-        console.log('[CogneeSupabase v8.2] Выход выполнен.');
+        console.log('[CogneeSupabase v8.3.2] Выход выполнен.');
     }
 
     // ─── ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ ────────────────────────────────────────────────
@@ -172,7 +174,7 @@
             });
         }
 
-        console.log(`[CogneeSupabase v8.2] Синхронизировано ${recent.length} записей КИМ.`);
+        console.log(`[CogneeSupabase v8.3.2] Синхронизировано ${recent.length} записей КИМ.`);
     }
 
     // ─── СОХРАНЕНИЕ ОДНОЙ ЗАПИСИ КИМ В ОБЛАКО ────────────────────────────────
@@ -221,7 +223,7 @@
         return text ? JSON.parse(text) : {};
     }
 
-    async function _dbFetch(method, path, body, extraHeaders) {
+    async function _dbFetch(method, path, body, extraHeaders, _isRetry) {
         const headers = {
             'Content-Type': 'application/json',
             'apikey': supabaseKey,
@@ -235,9 +237,28 @@
             body: body ? JSON.stringify(body) : undefined,
         });
 
+        // 401 JWT expired — пробуем обновить токен и повторить один раз
+        if (res.status === 401 && !_isRetry) {
+            const errBody = await res.json().catch(() => ({}));
+            const isExpired = errBody?.code === 'PGRST303' ||
+                              (errBody?.message || '').toLowerCase().includes('expired');
+
+            if (isExpired) {
+                console.log('[CogneeSupabase v8.3.2] JWT истёк — обновляем токен...');
+                const refreshed = await _refreshToken();
+                if (refreshed) {
+                    // Повторяем запрос с новым токеном
+                    return _dbFetch(method, path, body, extraHeaders, true);
+                }
+                // Если refresh не удался — пользователь разлогинен
+                console.warn('[CogneeSupabase v8.3.2] Refresh не удался — требуется повторный вход');
+                return null;
+            }
+        }
+
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            console.warn('[CogneeSupabase] DB ошибка:', err);
+            console.warn('[CogneeSupabase v8.3.2] DB ошибка:', err);
             return null;
         }
 
@@ -259,6 +280,55 @@
         } catch (e) {
             return null;
         }
+    }
+
+    // ─── ОБНОВЛЕНИЕ ТОКЕНА ───────────────────────────────────────────────────
+    // Supabase выдаёт access_token на 1 час. _refreshToken() обменивает
+    // refresh_token на новую пару токенов и сохраняет сессию.
+    let _refreshPromise = null; // дедупликация параллельных вызовов
+
+    async function _refreshToken() {
+        if (!currentSession?.refresh_token) {
+            _clearSession();
+            return false;
+        }
+
+        // Если уже идёт обновление — ждём его результата
+        if (_refreshPromise) return _refreshPromise;
+
+        _refreshPromise = (async () => {
+            try {
+                const res = await fetch(supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': supabaseKey,
+                    },
+                    body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+                });
+
+                if (!res.ok) {
+                    console.warn('[CogneeSupabase v8.3.2] Refresh failed:', res.status, '— выход');
+                    _clearSession();
+                    _dispatchAuthEvent('signed_out', null);
+                    return false;
+                }
+
+                const data = await res.json();
+                _saveSession(data);
+                if (data.user) currentUser = _extractUser(data);
+                console.log('[CogneeSupabase v8.3.2] Токен обновлён успешно');
+                return true;
+            } catch (e) {
+                console.warn('[CogneeSupabase v8.3.2] Ошибка refresh:', e.message);
+                _clearSession();
+                return false;
+            } finally {
+                _refreshPromise = null;
+            }
+        })();
+
+        return _refreshPromise;
     }
 
     function _saveSession(data) {
@@ -333,7 +403,7 @@
         if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
 
         const id = String(res[0].id);
-        console.log('[CogneeSupabase v8.3] Статья опубликована, id:', id);
+        console.log('[CogneeSupabase v8.3.2] Статья опубликована, id:', id);
         return id;
     }
 
@@ -394,5 +464,5 @@
         getUserArticles,
     };
 
-    console.log('[CogneeSupabase v8.3] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v8.3.2] Загружен. Ожидает init().');
 })();
