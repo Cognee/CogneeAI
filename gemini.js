@@ -1,5 +1,6 @@
-// gemini.js — v8.2
-// Файл: gemini.js | Глобальная версия: 8.2
+
+// gemini.js — v8.3.1
+// Файл: gemini.js | Глобальная версия: 8.3.1
 // Блок 1+2: AI-адаптация текста через Google Gemini 1.5 Flash.
 // Изменения v8.2:
 //   - Приоритетно использует Supabase Edge Function прокси (COGNEE_GEMINI_PROXY_URL)
@@ -72,7 +73,7 @@
             ? _simplifyPrompt(text)
             : _keywordsPrompt(text);
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: 'POST',
@@ -175,7 +176,7 @@ ${text}`;
         try {
             const simplified = await enqueue(() => callViaProxy('simplify', text));
             window.CogneeStorage?.saveSimplified(hash, simplified);
-            console.log('[CogneeAI v8.2] Упрощение получено:', hash.slice(0, 30) + '…');
+            console.log('[CogneeAI v8.3.1] Упрощение получено:', hash.slice(0, 30) + '…');
             return simplified;
         } catch (e) {
             console.warn('[CogneeAI] AI недоступен, fallback:', e.message);
@@ -198,7 +199,7 @@ ${text}`;
             const keywords = await enqueue(() => callViaProxy('keywords', text));
             const arr = Array.isArray(keywords) ? keywords : [];
             window.CogneeStorage?.saveKeywords(hash, arr);
-            console.log('[CogneeAI v8.2] Ключевые слова:', arr);
+            console.log('[CogneeAI v8.3.1] Ключевые слова:', arr);
             return arr;
         } catch (e) {
             console.warn('[CogneeAI] AI недоступен, fallback keywords:', e.message);
@@ -233,6 +234,6 @@ ${text}`;
         textHash,
     };
 
-    console.log('[CogneeAI gemini.js v8.2] Загружен. Транспорт:', _getStatusLabel());
+    console.log('[CogneeAI gemini.js v8.3.1] Загружен. Транспорт:', _getStatusLabel());
 
 })();

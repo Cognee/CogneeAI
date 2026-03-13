@@ -1,7 +1,7 @@
 
 /* ═══════════════════════════════════════════════════════════
-   Cognee — styles.css v8.2
-   Файл: styles.css | Глобальная версия: 8.2
+   Cognee — styles.css v8.3.1
+   Файл: styles.css | Глобальная версия: 8.3.1
    Изменения v8.1:
    - Добавлены стили AI-элементов (Блок 1): статус-строка, спиннер, keyword-ai
    ═══════════════════════════════════════════════════════════ */
@@ -413,6 +413,68 @@ body.mode-tired h2 {
     box-shadow: 0 2px 16px rgba(0,0,0,0.12);
 }
 
+/* ─── ССЫЛКА НА ПРОФИЛЬ (v8.2) ───────────────────────────────────────────── */
+/* Иконка 👤 под дашбордом                                                     */
+#profile-link {
+    position: fixed;
+    top: 104px;
+    right: 20px;
+    z-index: 9999;
+    background-color: var(--kim-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    text-decoration: none;
+    line-height: 1;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#profile-link:hover {
+    background-color: rgba(79,195,247,0.15);
+    border-color: rgba(79,195,247,0.3);
+}
+
+[data-theme="light"] #profile-link {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+}
+
+/* ─── ССЫЛКА НА ЛЕНДИНГ (v8.3) ───────────────────────────────────────────── */
+/* Иконка 🌐 под профилем                                                      */
+#landing-link {
+    position: fixed;
+    top: 148px;
+    right: 20px;
+    z-index: 9999;
+    background-color: var(--kim-bg);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    text-decoration: none;
+    line-height: 1;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#landing-link:hover {
+    background-color: rgba(79,195,247,0.15);
+    border-color: rgba(79,195,247,0.3);
+}
+
+[data-theme="light"] #landing-link {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+}
+
 /* ═══════════════════════════════════════════════════════════
    AI-ЭЛЕМЕНТЫ — Блок 1 v8.1 (CogneeAI / Gemini Flash)
    ═══════════════════════════════════════════════════════════ */
@@ -500,34 +562,4 @@ body.mode-tired h2 {
     background: rgba(26, 122, 181, 0.1);
     color: #1a5f8b;
     border-bottom-color: rgba(26, 122, 181, 0.35);
-}
-
-/* ─── ССЫЛКА НА ПРОФИЛЬ (v8.2) ───────────────────────────────────────────── */
-#profile-link {
-    position: fixed;
-    top: 102px;          /* ниже #dash-link на 42px */
-    right: 20px;
-    z-index: 9999;
-    background-color: var(--kim-bg);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 17px;
-    text-decoration: none;
-    line-height: 1;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-#profile-link:hover {
-    background-color: rgba(124,77,255,0.15);
-    border-color: rgba(124,77,255,0.3);
-}
-
-[data-theme="light"] #profile-link {
-    box-shadow: 0 2px 16px rgba(0,0,0,0.12);
 }
