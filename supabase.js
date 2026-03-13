@@ -1,11 +1,13 @@
 
-// supabase.js — v8.2
-// Файл: supabase.js | Глобальная версия: 8.2
-// Блок 2: Авторизация и база данных через Supabase.
-// Отвечает за: аутентификацию, синхронизацию КИМ-истории, профиль пользователя.
+// supabase.js — v8.3
+// Файл: supabase.js | Глобальная версия: 8.3
+// Блок 2+3: Авторизация и база данных через Supabase.
+// Отвечает за: аутентификацию, синхронизацию КИМ-истории, профиль, публикацию статей.
+// Изменения v8.3: добавлены publishArticle, getArticleById, getUserArticles
 // ВАЖНО: подключать ПОСЛЕ storage.js, ДО adapter.js
 // Экспортирует window.CogneeSupabase = { init, signUp, signIn, signOut, getUser,
-//   syncKIMHistory, saveKIMRemote, getUserProfile, updateProfile }
+//   syncKIMHistory, saveKIMRemote, getUserProfile, updateProfile,
+//   publishArticle, getArticleById, getUserArticles }
 
 (function () {
     'use strict';
@@ -303,6 +305,78 @@
         window.dispatchEvent(new CustomEvent('cognee:auth', { detail: { type, user } }));
     }
 
+    // ─── СТАТЬИ ──────────────────────────────────────────────────────────────
+
+    /**
+     * Публикует статью в Supabase.
+     * @param {object} data — { title, content, content_simple, keywords, annotation }
+     * @returns {Promise<string>} — ID статьи (строка)
+     */
+    async function publishArticle(data) {
+        _requireConfig();
+        if (!isAuthenticated()) throw new Error('Не авторизован');
+
+        const payload = {
+            user_id:        currentUser.id,
+            title:          data.title,
+            content:        data.content,
+            content_simple: data.content_simple || null,
+            keywords:       Array.isArray(data.keywords) ? data.keywords : [],
+            annotation:     data.annotation || null,
+            published_at:   new Date().toISOString(),
+        };
+
+        const res = await _dbFetch('POST', '/rest/v1/articles', [payload], {
+            'Prefer': 'return=representation'
+        });
+
+        if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
+
+        const id = String(res[0].id);
+        console.log('[CogneeSupabase v8.3] Статья опубликована, id:', id);
+        return id;
+    }
+
+    /**
+     * Загружает статью по ID (доступна всем — публичная или своя).
+     * @param {string} id
+     * @returns {Promise<object|null>}
+     */
+    async function getArticleById(id) {
+        _requireConfig();
+
+        // Числовой ID — запрос к Supabase
+        if (/^\d+$/.test(id)) {
+            const res = await _dbFetch(
+                'GET',
+                `/rest/v1/articles?id=eq.${id}&select=id,title,content,content_simple,keywords,annotation,published_at,user_id,users(display_name)`
+            );
+            if (res && res[0]) {
+                const a = res[0];
+                return {
+                    ...a,
+                    author_name: a.users?.display_name || 'Автор',
+                };
+            }
+            return null;
+        }
+
+        return null; // Локальные ID обрабатываются в reader.js
+    }
+
+    /**
+     * Возвращает список статей текущего пользователя.
+     * @returns {Promise<Array>}
+     */
+    async function getUserArticles() {
+        if (!isAuthenticated()) return [];
+        const res = await _dbFetch(
+            'GET',
+            `/rest/v1/articles?user_id=eq.${currentUser.id}&select=id,title,annotation,keywords,published_at&order=published_at.desc`
+        );
+        return Array.isArray(res) ? res : [];
+    }
+
     // ─── ЭКСПОРТ ─────────────────────────────────────────────────────────────
     window.CogneeSupabase = {
         init,
@@ -315,7 +389,10 @@
         saveKIMRemote,
         getUserProfile,
         updateProfile,
+        publishArticle,
+        getArticleById,
+        getUserArticles,
     };
 
-    console.log('[CogneeSupabase v8.2] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v8.3] Загружен. Ожидает init().');
 })();

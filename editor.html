@@ -1,0 +1,797 @@
+<!-- editor.html — v8.3 | Глобальная версия: 8.3 -->
+<!-- Блок 3: Редактор статей. Публикация через Gemini (упрощение, ключевые слова, аннотация). -->
+<!-- Статья сохраняется в Supabase, получает уникальный ID для чтения по ссылке reader.html?id= -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognee — Редактор статей</title>
+
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg:       #0a0e17;
+            --surface:  #10161f;
+            --surface2: #0d1320;
+            --border:   rgba(79,195,247,0.12);
+            --border2:  rgba(79,195,247,0.28);
+            --text:     #e0dbd0;
+            --muted:    #5a7090;
+            --accent:   #4FC3F7;
+            --accent2:  #7C4DFF;
+            --success:  #66BB6A;
+            --warn:     #FFB74D;
+            --danger:   #EF5350;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Lora', Georgia, serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        body::before {
+            content:'';
+            position:fixed; inset:0; pointer-events:none; z-index:0;
+            background:
+                radial-gradient(ellipse 70% 40% at 10% 0%, rgba(79,195,247,.06) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 90% 100%, rgba(124,77,255,.05) 0%, transparent 55%);
+        }
+        /* NAV */
+        .nav {
+            position:sticky; top:0; z-index:100;
+            background:rgba(10,14,23,.92); backdrop-filter:blur(12px);
+            border-bottom:1px solid var(--border);
+            padding:0 32px; height:56px;
+            display:flex; align-items:center; gap:20px;
+        }
+        .nav-logo {
+            font-family:'Unbounded',sans-serif; font-size:15px; font-weight:700;
+            color:var(--accent); text-decoration:none; letter-spacing:-.02em;
+        }
+        .nav-sep { flex:1; }
+        .nav-link {
+            font-family:'JetBrains Mono',monospace; font-size:12px;
+            color:var(--muted); text-decoration:none; letter-spacing:.04em;
+            transition:color .2s;
+        }
+        .nav-link:hover { color:var(--text); }
+        /* WRAP */
+        .editor-wrap {
+            position:relative; z-index:1;
+            max-width:860px; margin:0 auto; padding:40px 24px 100px;
+        }
+        .page-title {
+            font-family:'Unbounded',sans-serif;
+            font-size:clamp(18px,3vw,26px); font-weight:700; letter-spacing:-.03em;
+            color:var(--text); margin-bottom:6px;
+        }
+        .page-sub { font-size:14px; color:var(--muted); font-style:italic; margin-bottom:36px; }
+        /* STATS BAR */
+        .stats-bar {
+            display:flex; gap:28px; padding:12px 0;
+            border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+            margin-bottom:28px;
+        }
+        .stat { display:flex; flex-direction:column; gap:2px; }
+        .stat-val {
+            font-family:'Unbounded',sans-serif; font-size:20px; font-weight:700;
+            color:var(--accent); letter-spacing:-.02em;
+        }
+        .stat-lbl {
+            font-family:'JetBrains Mono',monospace; font-size:10px;
+            text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+        }
+        /* FIELDS */
+        .field-group { margin-bottom:22px; }
+        .field-label {
+            display:block; font-family:'JetBrains Mono',monospace; font-size:11px;
+            letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+            margin-bottom:8px;
+        }
+        .req { color:var(--accent); }
+        .field-input {
+            width:100%; background:var(--surface); border:1px solid var(--border);
+            border-radius:8px; color:var(--text); font-family:'Lora',Georgia,serif;
+            font-size:15px; padding:12px 16px; outline:none;
+            transition:border-color .2s, box-shadow .2s;
+        }
+        .field-input:focus {
+            border-color:var(--accent);
+            box-shadow:0 0 0 3px rgba(79,195,247,.1);
+        }
+        .field-input::placeholder { color:var(--muted); opacity:.6; }
+        #title-input {
+            font-family:'Unbounded',sans-serif; font-size:19px;
+            font-weight:700; letter-spacing:-.02em;
+        }
+        #content-area { min-height:380px; resize:vertical; line-height:1.8; }
+        .char-count {
+            font-family:'JetBrains Mono',monospace; font-size:11px;
+            color:var(--muted); text-align:right; margin-top:4px;
+        }
+        .field-hint { font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; }
+        /* TOOLBAR */
+        .editor-toolbar {
+            display:flex; gap:3px; padding:8px 10px;
+            background:var(--surface2); border:1px solid var(--border);
+            border-bottom:none; border-radius:8px 8px 0 0; flex-wrap:wrap;
+        }
+        .tool-btn {
+            font-family:'JetBrains Mono',monospace; font-size:12px;
+            background:transparent; border:1px solid transparent;
+            border-radius:4px; color:var(--muted); padding:4px 10px;
+            cursor:pointer; transition:all .15s;
+        }
+        .tool-btn:hover {
+            background:rgba(79,195,247,.08);
+            border-color:var(--border2); color:var(--text);
+        }
+        .editor-with-toolbar .field-input {
+            border-top-left-radius:0; border-top-right-radius:0;
+        }
+        /* AI PANEL */
+        .ai-panel {
+            background:var(--surface2); border:1px solid var(--border);
+            border-radius:12px; padding:24px; margin-bottom:28px;
+            position:relative; overflow:hidden;
+        }
+        .ai-panel::before {
+            content:''; position:absolute; top:0; left:0; right:0; height:1px;
+            background:linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity:.35;
+        }
+        .ai-panel-hdr {
+            font-family:'JetBrains Mono',monospace; font-size:11px;
+            letter-spacing:.1em; text-transform:uppercase; color:var(--accent);
+            margin-bottom:16px; display:flex; align-items:center; gap:8px;
+        }
+        .ai-dot {
+            width:6px; height:6px; border-radius:50%; background:var(--accent);
+            animation:pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+        /* AI PROGRESS */
+        .ai-progress { display:none; }
+        .ai-progress.vis { display:flex; align-items:flex-start; gap:14px; }
+        .spinner {
+            width:16px; height:16px; border:2px solid rgba(79,195,247,.2);
+            border-top-color:var(--accent); border-radius:50%;
+            animation:spin .7s linear infinite; flex-shrink:0; margin-top:2px;
+        }
+        @keyframes spin { to{transform:rotate(360deg)} }
+        .step-list { list-style:none; }
+        .step {
+            font-family:'JetBrains Mono',monospace; font-size:12px;
+            color:var(--muted); padding:3px 0;
+            display:flex; align-items:center; gap:8px; transition:color .3s;
+        }
+        .step.done { color:var(--success); }
+        .step.active { color:var(--accent); }
+        /* AI RESULTS */
+        .ai-results { display:none; }
+        .ai-results.vis { display:block; }
+        .result-block { margin-bottom:18px; }
+        .result-lbl {
+            font-family:'JetBrains Mono',monospace; font-size:11px;
+            text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+            margin-bottom:7px;
+        }
+        .result-box {
+            background:rgba(79,195,247,.04); border:1px solid rgba(79,195,247,.1);
+            border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.65;
+            color:var(--text); min-height:36px;
+        }
+        .kw-list { display:flex; flex-wrap:wrap; gap:7px; }
+        .kw-tag {
+            font-family:'JetBrains Mono',monospace; font-size:11px;
+            background:rgba(79,195,247,.08); border:1px solid rgba(79,195,247,.2);
+            border-radius:4px; padding:3px 10px; color:var(--accent);
+            letter-spacing:.04em;
+        }
+        /* AI IDLE */
+        .ai-idle {
+            font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted);
+        }
+        /* BUTTONS */
+        .actions-row { display:flex; gap:11px; flex-wrap:wrap; align-items:center; }
+        .btn {
+            font-family:'JetBrains Mono',monospace; font-size:13px;
+            letter-spacing:.04em; border:1px solid transparent;
+            border-radius:8px; padding:11px 22px; cursor:pointer;
+            transition:all .2s; display:inline-flex; align-items:center; gap:8px;
+            text-decoration:none; -webkit-appearance:none;
+        }
+        .btn:disabled { opacity:.4; cursor:not-allowed; }
+        .btn-secondary {
+            background:transparent; border-color:var(--border2); color:var(--text);
+        }
+        .btn-secondary:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+        .btn-publish {
+            background:linear-gradient(135deg,var(--accent2),var(--accent));
+            color:#fff; font-weight:700;
+        }
+        .btn-publish:hover:not(:disabled) {
+            box-shadow:0 0 20px rgba(124,77,255,.4); transform:translateY(-1px);
+        }
+        /* PUBLISH STATUS */
+        .pub-status { display:none; margin-top:22px; }
+        .pub-status.vis { display:block; }
+        .status-card {
+            background:var(--surface2); border-radius:10px; padding:20px 24px;
+            border-left:3px solid var(--success);
+        }
+        .status-card.err { border-left-color:var(--danger); }
+        .status-title {
+            font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
+            color:var(--success); margin-bottom:10px;
+            display:flex; align-items:center; gap:8px;
+        }
+        .status-card.err .status-title { color:var(--danger); }
+        .link-row { display:flex; align-items:center; gap:10px; margin-top:10px; }
+        .status-link {
+            font-family:'JetBrains Mono',monospace; font-size:12px;
+            color:var(--accent); word-break:break-all; flex:1;
+        }
+        .btn-copy {
+            font-family:'JetBrains Mono',monospace; font-size:11px;
+            background:rgba(79,195,247,.1); border:1px solid var(--border2);
+            border-radius:6px; padding:5px 12px; color:var(--accent);
+            cursor:pointer; transition:all .2s; white-space:nowrap;
+        }
+        .btn-copy:hover { background:rgba(79,195,247,.2); }
+        .btn-copy.copied { color:var(--success); border-color:var(--success); }
+        /* AUTH GUARD */
+        .auth-guard { text-align:center; padding:80px 24px; }
+        .auth-guard-title {
+            font-family:'Unbounded',sans-serif; font-size:22px;
+            font-weight:700; color:var(--text); margin-bottom:10px;
+        }
+        .auth-guard-sub { font-size:15px; color:var(--muted); margin-bottom:28px; }
+        .btn-primary { background:var(--accent); color:#0a0e17; font-weight:700; }
+        .btn-primary:hover:not(:disabled) {
+            background:#7fd8f8; box-shadow:0 0 16px rgba(79,195,247,.3);
+        }
+        /* TOAST */
+        .toast {
+            position:fixed; bottom:28px; left:50%;
+            transform:translateX(-50%) translateY(20px);
+            background:var(--surface2); border:1px solid var(--border2);
+            border-radius:8px; padding:10px 20px;
+            font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text);
+            z-index:9999; opacity:0; transition:all .3s; pointer-events:none;
+            white-space:nowrap;
+        }
+        .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+        /* RESPONSIVE */
+        @media(max-width:600px){
+            .editor-wrap{padding:24px 16px 60px;}
+            .nav{padding:0 16px; gap:14px;}
+            .actions-row{flex-direction:column; align-items:stretch;}
+            .stats-bar{gap:16px;}
+            .btn{justify-content:center;}
+        }
+    </style>
+</head>
+<body>
+
+<nav class="nav">
+    <a class="nav-logo" href="index.html">Cognee</a>
+    <div class="nav-sep"></div>
+    <a class="nav-link" href="index.html">← Читалка</a>
+    <a class="nav-link" href="profile.html">Профиль</a>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<div class="editor-wrap">
+
+    <!-- AUTH GUARD -->
+    <div class="auth-guard" id="auth-guard" style="display:none">
+        <div class="auth-guard-title">Нужна авторизация</div>
+        <div class="auth-guard-sub">Войди в аккаунт, чтобы публиковать статьи через CogneeAI</div>
+        <a class="btn btn-primary" href="auth.html">Войти / Зарегистрироваться</a>
+    </div>
+
+    <!-- РЕДАКТОР -->
+    <div id="editor-body">
+        <div class="page-title">Редактор статей</div>
+        <div class="page-sub">Пиши — CogneeAI создаст упрощённую версию, аннотацию и ключевые слова</div>
+
+        <!-- СЧЁТЧИК -->
+        <div class="stats-bar">
+            <div class="stat"><span class="stat-val" id="wc-words">0</span><span class="stat-lbl">слов</span></div>
+            <div class="stat"><span class="stat-val" id="wc-chars">0</span><span class="stat-lbl">символов</span></div>
+            <div class="stat"><span class="stat-val" id="wc-read">0</span><span class="stat-lbl">мин чтения</span></div>
+            <div class="stat"><span class="stat-val" id="wc-para">0</span><span class="stat-lbl">абзацев</span></div>
+        </div>
+
+        <!-- ЗАГОЛОВОК -->
+        <div class="field-group">
+            <label class="field-label" for="title-input">Название статьи <span class="req">*</span></label>
+            <input type="text" id="title-input" class="field-input"
+                placeholder="Введи заголовок..." maxlength="200" autocomplete="off">
+            <div class="char-count"><span id="title-chars">0</span> / 200</div>
+        </div>
+
+        <!-- ТЕКСТ -->
+        <div class="field-group">
+            <label class="field-label" for="content-area">Текст статьи <span class="req">*</span></label>
+            <div class="editor-with-toolbar">
+                <div class="editor-toolbar">
+                    <button class="tool-btn" data-cmd="bold">B</button>
+                    <button class="tool-btn" data-cmd="italic"><i>I</i></button>
+                    <button class="tool-btn" data-cmd="h2">H2</button>
+                    <button class="tool-btn" data-cmd="h3">H3</button>
+                    <button class="tool-btn" data-cmd="quote">❝</button>
+                    <button class="tool-btn" data-cmd="ul">• список</button>
+                    <button class="tool-btn" data-cmd="hr">─ разделитель</button>
+                </div>
+                <textarea id="content-area" class="field-input"
+                    placeholder="Напиши свою статью. Каждый абзац разделяй пустой строкой — CogneeAI обработает каждый отдельно."></textarea>
+            </div>
+            <div class="field-hint">Разделяй абзацы пустой строкой. Gemini создаст упрощённую версию каждого абзаца для уставших читателей.</div>
+        </div>
+
+        <!-- AI ПАНЕЛЬ -->
+        <div class="ai-panel">
+            <div class="ai-panel-hdr">
+                <span class="ai-dot"></span>
+                CogneeAI обработка
+            </div>
+
+            <!-- Прогресс -->
+            <div class="ai-progress" id="ai-progress">
+                <div class="spinner"></div>
+                <ul class="step-list" id="step-list">
+                    <li class="step" id="step-parse" data-lbl="Разбивка на абзацы">⟡ Разбивка на абзацы</li>
+                    <li class="step" id="step-simplify" data-lbl="Упрощение текста через Gemini">⟡ Упрощение текста через Gemini</li>
+                    <li class="step" id="step-keywords" data-lbl="Извлечение ключевых слов">⟡ Извлечение ключевых слов</li>
+                    <li class="step" id="step-annotation" data-lbl="Создание аннотации">⟡ Создание аннотации</li>
+                </ul>
+            </div>
+
+            <!-- Результаты -->
+            <div class="ai-results" id="ai-results">
+                <div class="result-block">
+                    <div class="result-lbl">📝 Аннотация</div>
+                    <div class="result-box" id="res-annotation">—</div>
+                </div>
+                <div class="result-block">
+                    <div class="result-lbl">🏷 Ключевые слова</div>
+                    <div class="result-box"><div class="kw-list" id="res-keywords"></div></div>
+                </div>
+                <div class="result-block">
+                    <div class="result-lbl">📦 Упрощённые абзацы</div>
+                    <div class="result-box" id="res-simplified-count">—</div>
+                </div>
+            </div>
+
+            <!-- Idle -->
+            <div class="ai-idle" id="ai-idle">
+                Нажми «Обработать через AI» — Gemini создаст адаптивную версию текста.
+            </div>
+        </div>
+
+        <!-- КНОПКИ -->
+        <div class="actions-row">
+            <button class="btn btn-secondary" id="btn-process" onclick="processWithAI()">
+                🧠 Обработать через AI
+            </button>
+            <button class="btn btn-publish" id="btn-publish" onclick="publishArticle()" disabled>
+                🚀 Опубликовать статью
+            </button>
+            <button class="btn btn-secondary" onclick="saveDraft()">
+                💾 Сохранить черновик
+            </button>
+        </div>
+
+        <!-- СТАТУС ПУБЛИКАЦИИ -->
+        <div class="pub-status" id="pub-status"></div>
+    </div>
+</div>
+
+<script src="config.js" onerror="console.warn('[Cognee] config.js не найден')"></script>
+<script src="storage.js"></script>
+<script src="supabase.js"></script>
+<script src="gemini.js"></script>
+
+<script>
+// editor.js inline — v8.3
+(function(){
+'use strict';
+
+const S = {
+    aiDone: false,
+    simplified: [],   // [{hash, original, simplified}]
+    keywords: [],
+    annotation: '',
+    DRAFT_KEY: 'cognee_editor_draft',
+};
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+    await initAuth();
+    restoreDraft();
+    setupCounters();
+    setupToolbar();
+});
+
+async function initAuth() {
+    if (!window.CogneeSupabase) return;
+    const ok = await window.CogneeSupabase.init();
+    if (!ok && !window.CogneeSupabase.isAuthenticated()) {
+        document.getElementById('auth-guard').style.display = 'block';
+        document.getElementById('editor-body').style.display = 'none';
+    }
+}
+
+// ── СЧЁТЧИКИ ──────────────────────────────────────────────────────────────────
+function setupCounters() {
+    const title = document.getElementById('title-input');
+    const area  = document.getElementById('content-area');
+    title.addEventListener('input', () => {
+        document.getElementById('title-chars').textContent = title.value.length;
+    });
+    area.addEventListener('input', () => {
+        updateStats(area.value);
+        S.aiDone = false;
+        document.getElementById('btn-publish').disabled = true;
+    });
+}
+
+function updateStats(text) {
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const chars = text.length;
+    const read  = Math.max(1, Math.round(words / 200));
+    const para  = text.split(/\n\s*\n/).filter(p => p.trim()).length;
+    document.getElementById('wc-words').textContent = words;
+    document.getElementById('wc-chars').textContent = chars;
+    document.getElementById('wc-read').textContent  = read;
+    document.getElementById('wc-para').textContent  = para;
+}
+
+// ── TOOLBAR ───────────────────────────────────────────────────────────────────
+function setupToolbar() {
+    document.querySelectorAll('.tool-btn[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const area = document.getElementById('content-area');
+            const s = area.selectionStart, e = area.selectionEnd;
+            const sel = area.value.slice(s, e);
+            const cmd = btn.dataset.cmd;
+            let ins = '';
+            if (cmd === 'bold')   ins = `**${sel||'жирный'}**`;
+            if (cmd === 'italic') ins = `_${sel||'курсив'}_`;
+            if (cmd === 'h2')     ins = `\n## ${sel||'Заголовок'}\n`;
+            if (cmd === 'h3')     ins = `\n### ${sel||'Подзаголовок'}\n`;
+            if (cmd === 'quote')  ins = `\n> ${sel||'Цитата'}\n`;
+            if (cmd === 'ul')     ins = `\n- ${sel||'Пункт'}\n`;
+            if (cmd === 'hr')     ins = `\n\n---\n\n`;
+            area.value = area.value.slice(0,s) + ins + area.value.slice(e);
+            area.selectionStart = area.selectionEnd = s + ins.length;
+            area.focus();
+            updateStats(area.value);
+        });
+    });
+}
+
+// ── ЧЕРНОВИК ──────────────────────────────────────────────────────────────────
+window.saveDraft = function() {
+    const t = document.getElementById('title-input').value;
+    const c = document.getElementById('content-area').value;
+    if (!t && !c) { toast('Нечего сохранять'); return; }
+    try {
+        localStorage.setItem(S.DRAFT_KEY, JSON.stringify({t, c, ts: Date.now()}));
+        toast('💾 Черновик сохранён');
+    } catch(e) { toast('Ошибка сохранения'); }
+};
+
+function restoreDraft() {
+    try {
+        const raw = localStorage.getItem(S.DRAFT_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d.t) document.getElementById('title-input').value = d.t;
+        if (d.c) {
+            document.getElementById('content-area').value = d.c;
+            updateStats(d.c);
+        }
+        const ago = Math.round((Date.now() - d.ts) / 60000);
+        toast(`↩ Черновик восстановлен (${ago} мин назад)`, 3500);
+    } catch(e) { localStorage.removeItem(S.DRAFT_KEY); }
+}
+
+// ── STEP HELPER ───────────────────────────────────────────────────────────────
+function setStep(id, status) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'step ' + status;
+    const icon = {done:'✓', active:'▶', '':'⟡'}[status] || '⟡';
+    el.textContent = icon + ' ' + el.dataset.lbl;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── AI ОБРАБОТКА ──────────────────────────────────────────────────────────────
+window.processWithAI = async function() {
+    const title   = document.getElementById('title-input').value.trim();
+    const content = document.getElementById('content-area').value.trim();
+
+    if (!title)           { toast('⚠ Введи название статьи', 2500); return; }
+    if (content.length < 100) { toast('⚠ Текст слишком короткий (минимум 100 символов)', 2500); return; }
+
+    const btn = document.getElementById('btn-process');
+    btn.disabled = true;
+
+    document.getElementById('ai-idle').style.display = 'none';
+    document.getElementById('ai-results').classList.remove('vis');
+    document.getElementById('ai-progress').classList.add('vis');
+
+    ['step-parse','step-simplify','step-keywords','step-annotation'].forEach(id => setStep(id, ''));
+
+    // Шаг 1: Разбивка
+    setStep('step-parse', 'active');
+    const paras = content.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 20);
+    await sleep(300);
+    setStep('step-parse', 'done');
+
+    // Шаг 2: Упрощение
+    setStep('step-simplify', 'active');
+    S.simplified = [];
+    const workParas = paras.slice(0, 12);
+    for (let i = 0; i < workParas.length; i++) {
+        const p = workParas[i];
+        // Заголовки / служебные строки — пропускаем упрощение
+        if (/^(#{1,3}|---|>)/.test(p)) {
+            S.simplified.push({ original: p, simplified: p, isService: true });
+            continue;
+        }
+        try {
+            const simp = window.CogneeAI
+                ? await window.CogneeAI.simplifyParagraph(p)
+                : localSimplify(p);
+            S.simplified.push({ original: p, simplified: simp, isService: false });
+        } catch(e) {
+            S.simplified.push({ original: p, simplified: localSimplify(p), isService: false });
+        }
+    }
+    setStep('step-simplify', 'done');
+
+    // Шаг 3: Ключевые слова
+    setStep('step-keywords', 'active');
+    const kwSrc = paras.slice(0, 4).join(' ');
+    try {
+        S.keywords = window.CogneeAI
+            ? await window.CogneeAI.extractKeywords(kwSrc)
+            : localKeywords(kwSrc);
+    } catch(e) { S.keywords = localKeywords(kwSrc); }
+    setStep('step-keywords', 'done');
+
+    // Шаг 4: Аннотация
+    setStep('step-annotation', 'active');
+    try {
+        S.annotation = await geminiAnnotation(title, paras.slice(0,2).join('\n'));
+    } catch(e) { S.annotation = localAnnotation(paras); }
+    setStep('step-annotation', 'done');
+
+    await sleep(250);
+    document.getElementById('ai-progress').classList.remove('vis');
+    renderAIResults();
+    S.aiDone = true;
+    document.getElementById('btn-publish').disabled = false;
+    btn.disabled = false;
+};
+
+function renderAIResults() {
+    document.getElementById('res-annotation').textContent = S.annotation || '—';
+
+    const kwWrap = document.getElementById('res-keywords');
+    kwWrap.innerHTML = '';
+    if (S.keywords.length) {
+        S.keywords.forEach(kw => {
+            const span = document.createElement('span');
+            span.className = 'kw-tag';
+            span.textContent = kw;
+            kwWrap.appendChild(span);
+        });
+    } else {
+        kwWrap.textContent = '—';
+    }
+
+    const simpCount = S.simplified.filter(d => !d.isService && d.original !== d.simplified).length;
+    const totalCount = S.simplified.filter(d => !d.isService).length;
+    document.getElementById('res-simplified-count').textContent =
+        `${simpCount} из ${totalCount} смысловых абзацев получили упрощённую версию`;
+
+    document.getElementById('ai-results').classList.add('vis');
+}
+
+// ── ПУБЛИКАЦИЯ ────────────────────────────────────────────────────────────────
+window.publishArticle = async function() {
+    const title   = document.getElementById('title-input').value.trim();
+    const content = document.getElementById('content-area').value.trim();
+    if (!title || !content) { toast('⚠ Заполни название и текст', 2500); return; }
+
+    const btn = document.getElementById('btn-publish');
+    btn.disabled = true;
+    btn.textContent = '⏳ Публикуем...';
+
+    try {
+        let articleId;
+        const supabase = window.CogneeSupabase;
+
+        if (supabase && supabase.isAuthenticated()) {
+            articleId = await supabase.publishArticle({
+                title,
+                content,
+                content_simple: JSON.stringify(S.simplified),
+                keywords:       S.keywords,
+                annotation:     S.annotation,
+            });
+        } else {
+            articleId = saveLocally({ title, content });
+            toast('⚠ Сохранено локально (войди для синхронизации)', 3500);
+        }
+
+        const base = location.href.replace('editor.html', '');
+        const url  = `${base}reader.html?id=${articleId}`;
+        showPublishOK(url);
+        localStorage.removeItem(S.DRAFT_KEY);
+
+    } catch(e) {
+        console.error('[Editor] Ошибка публикации:', e);
+        showPublishErr(e.message || 'Неизвестная ошибка');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🚀 Опубликовать статью';
+};
+
+function showPublishOK(url) {
+    const el = document.getElementById('pub-status');
+    el.innerHTML = `
+        <div class="status-card">
+            <div class="status-title">✓ Статья опубликована!</div>
+            <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Ссылка для чтения с CogneeAI адаптацией:</div>
+            <div class="link-row">
+                <a class="status-link" href="${url}" target="_blank">${url}</a>
+                <button class="btn-copy" id="cp-btn" onclick="copyURL('${url}')">Копировать</button>
+            </div>
+            <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+                <a class="btn btn-secondary" href="${url}" target="_blank"
+                   style="font-size:12px;padding:7px 14px;">👁 Открыть статью</a>
+                <button class="btn btn-secondary"
+                        style="font-size:12px;padding:7px 14px;" onclick="resetEditor()">
+                    + Новая статья
+                </button>
+            </div>
+        </div>`;
+    el.classList.add('vis');
+    el.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function showPublishErr(msg) {
+    const el = document.getElementById('pub-status');
+    el.innerHTML = `
+        <div class="status-card err">
+            <div class="status-title">✗ Ошибка публикации</div>
+            <div style="font-size:13px;color:var(--muted)">${msg}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:8px">Статья сохранена как черновик.</div>
+        </div>`;
+    el.classList.add('vis');
+}
+
+window.copyURL = function(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('cp-btn');
+        if (btn) { btn.textContent = '✓ Скопировано'; btn.classList.add('copied'); }
+        toast('✓ Ссылка скопирована');
+    }).catch(() => toast('Скопируй ссылку вручную'));
+};
+
+window.resetEditor = function() {
+    document.getElementById('title-input').value  = '';
+    document.getElementById('content-area').value = '';
+    document.getElementById('pub-status').classList.remove('vis');
+    document.getElementById('ai-results').classList.remove('vis');
+    document.getElementById('ai-idle').style.display = '';
+    document.getElementById('btn-publish').disabled = true;
+    document.getElementById('title-chars').textContent = '0';
+    S.aiDone = false; S.simplified = []; S.keywords = []; S.annotation = '';
+    updateStats('');
+};
+
+// ── ЛОКАЛЬНОЕ СОХРАНЕНИЕ (fallback) ───────────────────────────────────────────
+function saveLocally({ title, content }) {
+    const id = 'local_' + Date.now();
+    try {
+        const all = JSON.parse(localStorage.getItem('cognee_articles') || '{}');
+        all[id] = {
+            id, title, content,
+            content_simple: JSON.stringify(S.simplified),
+            keywords:  S.keywords,
+            annotation: S.annotation,
+            published_at: new Date().toISOString(),
+            author: 'Аноним (локально)',
+        };
+        localStorage.setItem('cognee_articles', JSON.stringify(all));
+    } catch(e) {}
+    return id;
+}
+
+// ── АННОТАЦИЯ ЧЕРЕЗ GEMINI ────────────────────────────────────────────────────
+async function geminiAnnotation(title, snippet) {
+    const prompt =
+        `Напиши аннотацию к статье "${title}" в 2-3 предложениях на русском языке.` +
+        ` Текст начала:\n${snippet}\nВерни ТОЛЬКО аннотацию, без заголовков.`;
+
+    // Через прокси
+    const proxy = window.COGNEE_GEMINI_PROXY_URL;
+    if (proxy) {
+        try {
+            const r = await fetch(proxy, {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ task:'annotation', text: prompt, lang:'ru' }),
+            });
+            if (r.ok) { const d = await r.json(); return d.annotation || d.simplified || ''; }
+        } catch(e) {}
+    }
+
+    // Прямой ключ
+    const key = window.COGNEE_GEMINI_KEY;
+    if (!key) return localAnnotation(snippet.split('\n'));
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    const r = await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+            contents:[{parts:[{text:prompt}]}],
+            generationConfig:{temperature:.4, maxOutputTokens:200}
+        })
+    });
+    if (!r.ok) return localAnnotation(snippet.split('\n'));
+    const d = await r.json();
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || localAnnotation(snippet.split('\n'));
+}
+
+// ── ЛОКАЛЬНЫЕ FALLBACKS ───────────────────────────────────────────────────────
+function localSimplify(text) {
+    const s = text.match(/[^.!?]+[.!?]+/g) || [];
+    return s.slice(0,2).join(' ').trim() || text.slice(0,150) + '…';
+}
+function localKeywords(text) {
+    const words = text.toLowerCase().match(/[а-яёa-z]{5,}/g) || [];
+    const freq = {};
+    words.forEach(w => freq[w] = (freq[w]||0) + 1);
+    return Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,8).map(([w]) => w);
+}
+function localAnnotation(paras) {
+    const first = paras[0] || '';
+    const sents = first.match(/[^.!?]+[.!?]+/g) || [];
+    return sents.slice(0,2).join(' ').trim() || first.slice(0,200);
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let _toastTimer = null;
+function toast(msg, dur = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+})();
+</script>
+</body>
+</html>
