@@ -1,5 +1,5 @@
-// supabase.js — v8.3.2
-// Файл: supabase.js | Глобальная версия: 8.3.2
+// supabase.js — v8.3.3
+// Файл: supabase.js | Глобальная версия: 8.3.3
 // Блок 2+3: Авторизация и база данных через Supabase.
 // Отвечает за: аутентификацию, синхронизацию КИМ-истории, профиль, публикацию статей.
 // Изменения v8.3: добавлены publishArticle, getArticleById, getUserArticles
@@ -40,7 +40,7 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser = verified;
-                        console.log('[CogneeSupabase v8.3.2] Сессия восстановлена:', currentUser.email);
+                        console.log('[CogneeSupabase v8.3.3] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
                         return true;
                     }
@@ -50,7 +50,7 @@
             localStorage.removeItem('cognee_session');
         }
 
-        console.log('[CogneeSupabase v8.3.2] Инициализирован. Пользователь не авторизован.');
+        console.log('[CogneeSupabase v8.3.3] Инициализирован. Пользователь не авторизован.');
         return false;
     }
 
@@ -70,6 +70,8 @@
             _saveSession(res);
             currentUser = _extractUser(res);
             _dispatchAuthEvent('signed_up', currentUser);
+            // Создаём профиль сразу при регистрации
+            _upsertProfile().catch(e => console.warn('[CogneeSupabase v8.3.3] upsert profile on signup:', e.message));
         }
 
         return res;
@@ -90,7 +92,7 @@
         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
 
         // После входа — синхронизируем историю КИМ
-        syncKIMHistory().catch(err => console.warn('[CogneeSupabase v8.3.2] Ошибка синхронизации КИМ:', err));
+        syncKIMHistory().catch(err => console.warn('[CogneeSupabase v8.3.3] Ошибка синхронизации КИМ:', err));
 
         return currentUser;
     }
@@ -107,7 +109,7 @@
 
         _clearSession();
         _dispatchAuthEvent('signed_out', null);
-        console.log('[CogneeSupabase v8.3.2] Выход выполнен.');
+        console.log('[CogneeSupabase v8.3.3] Выход выполнен.');
     }
 
     // ─── ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ ────────────────────────────────────────────────
@@ -174,7 +176,7 @@
             });
         }
 
-        console.log(`[CogneeSupabase v8.3.2] Синхронизировано ${recent.length} записей КИМ.`);
+        console.log(`[CogneeSupabase v8.3.3] Синхронизировано ${recent.length} записей КИМ.`);
     }
 
     // ─── СОХРАНЕНИЕ ОДНОЙ ЗАПИСИ КИМ В ОБЛАКО ────────────────────────────────
@@ -244,21 +246,21 @@
                               (errBody?.message || '').toLowerCase().includes('expired');
 
             if (isExpired) {
-                console.log('[CogneeSupabase v8.3.2] JWT истёк — обновляем токен...');
+                console.log('[CogneeSupabase v8.3.3] JWT истёк — обновляем токен...');
                 const refreshed = await _refreshToken();
                 if (refreshed) {
                     // Повторяем запрос с новым токеном
                     return _dbFetch(method, path, body, extraHeaders, true);
                 }
                 // Если refresh не удался — пользователь разлогинен
-                console.warn('[CogneeSupabase v8.3.2] Refresh не удался — требуется повторный вход');
+                console.warn('[CogneeSupabase v8.3.3] Refresh не удался — требуется повторный вход');
                 return null;
             }
         }
 
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            console.warn('[CogneeSupabase v8.3.2] DB ошибка:', err);
+            console.warn('[CogneeSupabase v8.3.3] DB ошибка:', err);
             return null;
         }
 
@@ -308,7 +310,7 @@
                 });
 
                 if (!res.ok) {
-                    console.warn('[CogneeSupabase v8.3.2] Refresh failed:', res.status, '— выход');
+                    console.warn('[CogneeSupabase v8.3.3] Refresh failed:', res.status, '— выход');
                     _clearSession();
                     _dispatchAuthEvent('signed_out', null);
                     return false;
@@ -317,10 +319,10 @@
                 const data = await res.json();
                 _saveSession(data);
                 if (data.user) currentUser = _extractUser(data);
-                console.log('[CogneeSupabase v8.3.2] Токен обновлён успешно');
+                console.log('[CogneeSupabase v8.3.3] Токен обновлён успешно');
                 return true;
             } catch (e) {
-                console.warn('[CogneeSupabase v8.3.2] Ошибка refresh:', e.message);
+                console.warn('[CogneeSupabase v8.3.3] Ошибка refresh:', e.message);
                 _clearSession();
                 return false;
             } finally {
@@ -359,15 +361,24 @@
     }
 
     async function _upsertProfile() {
+        if (!currentUser?.id) return null;
         const profile = {
             id:           currentUser.id,
             email:        currentUser.email,
             display_name: currentUser.display_name,
             created_at:   new Date().toISOString(),
         };
-        await _dbFetch('POST', '/rest/v1/users', [profile], {
-            'Prefer': 'resolution=ignore-duplicates,return=minimal'
+        // resolution=merge-duplicates: если профиль есть — обновляем email/display_name
+        // resolution=ignore-duplicates: если есть — пропускаем (fallback)
+        const res = await _dbFetch('POST', '/rest/v1/users', [profile], {
+            'Prefer': 'resolution=merge-duplicates,return=minimal'
         });
+        if (res === null) {
+            // Повторяем с ignore на случай конфликта политик
+            await _dbFetch('POST', '/rest/v1/users', [profile], {
+                'Prefer': 'resolution=ignore-duplicates,return=minimal'
+            });
+        }
         return profile;
     }
 
@@ -386,6 +397,9 @@
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
 
+        // Гарантируем существование профиля в public.users (FK constraint)
+        await _upsertProfile();
+
         const payload = {
             user_id:        currentUser.id,
             title:          data.title,
@@ -403,7 +417,7 @@
         if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
 
         const id = String(res[0].id);
-        console.log('[CogneeSupabase v8.3.2] Статья опубликована, id:', id);
+        console.log('[CogneeSupabase v8.3.3] Статья опубликована, id:', id);
         return id;
     }
 
@@ -464,5 +478,5 @@
         getUserArticles,
     };
 
-    console.log('[CogneeSupabase v8.3.2] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v8.3.3] Загружен. Ожидает init().');
 })();
