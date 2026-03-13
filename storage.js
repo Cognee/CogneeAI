@@ -1,5 +1,6 @@
-// storage.js — v8.1
-// Файл: storage.js | Глобальная версия: 8.1
+
+// storage.js — v8.3
+// Файл: storage.js | Глобальная версия: 8.3
 // Хранение истории КИМ в localStorage между сессиями.
 // Блок 1 (v8.1): добавлен кэш AI-упрощений и AI-ключевых слов (экономия лимитов Gemini Flash).
 // Экспортирует window.CogneeStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour, saveSimplified, getSimplified, saveKeywords, getKeywords }
@@ -10,14 +11,18 @@
 
     /**
      * Сохраняет одну запись КИМ в localStorage.
-     * @param {number} kim — значение КИМ (0–100)
-     * @param {number} timestamp — Unix timestamp в мс (Date.now())
+     * @param {number} kim    — значение КИМ (0–100)
+     * @param {string} [zone] — 'focus'|'normal'|'tired' (опционально, вычисляется автоматически)
+     * @param {number} [ts]   — Unix timestamp в мс (Date.now() по умолчанию)
      */
-    function saveKIM(kim, timestamp) {
+    function saveKIM(kim, zone, ts) {
+        // Обратная совместимость: если zone — число, это старый вызов saveKIM(kim, timestamp)
+        if (typeof zone === 'number') { ts = zone; zone = undefined; }
         try {
-            const history = _load();
-            const zone = _getZone(kim);
-            history.push({ kim: Math.round(kim * 10) / 10, timestamp, zone });
+            const history  = _load();
+            const safeZone = (typeof zone === 'string' && zone) ? zone : _getZone(kim);
+            const safeTs   = (typeof ts === 'number' && ts > 0) ? ts : Date.now();
+            history.push({ kim: Math.round(kim * 10) / 10, timestamp: safeTs, zone: safeZone });
             // Храним не более MAX_RECORDS записей (удаляем старые)
             if (history.length > MAX_RECORDS) {
                 history.splice(0, history.length - MAX_RECORDS);
@@ -45,7 +50,10 @@
         const history = _load();
         const buckets = Array.from({ length: 24 }, () => ({ sum: 0, count: 0 }));
         history.forEach(({ kim, timestamp }) => {
-            const hour = new Date(timestamp).getHours();
+            if (typeof kim !== 'number' || isNaN(kim)) return;
+            const ts   = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
+            const hour = new Date(ts).getHours();
+            if (hour < 0 || hour > 23 || isNaN(hour)) return;
             buckets[hour].sum += kim;
             buckets[hour].count += 1;
         });
@@ -60,7 +68,10 @@
         const history = _load();
         const buckets = Array.from({ length: 7 }, () => ({ sum: 0, count: 0 }));
         history.forEach(({ kim, timestamp }) => {
-            const day = new Date(timestamp).getDay(); // 0=вс, 6=сб
+            if (typeof kim !== 'number' || isNaN(kim)) return;
+            const ts  = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
+            const day = new Date(ts).getDay();
+            if (day < 0 || day > 6 || isNaN(day)) return;
             buckets[day].sum += kim;
             buckets[day].count += 1;
         });
