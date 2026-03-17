@@ -6,7 +6,7 @@
 //   • добавлена _annotationPrompt
 //   • исправлен _callGeminiDirect — поддерживает task='annotation'
 //   • экспорт: window.CogneeAI (не CogneeGemini!)
-// Экспортирует window.CogneeAI = { simplifyParagraph, simplifyParagraphs, extractKeywords, generateAnnotation, textHash }
+// Экспортирует window.CogneeAI = { simplifyParagraph, simplifyParagraphs, generateAnnotation, textHash }
 
 (function () {
     'use strict';
@@ -209,7 +209,6 @@
     window.CogneeAI = {
         simplifyParagraph,
         simplifyParagraphs,
-        extractKeywords,
         generateAnnotation,
         textHash,
     };

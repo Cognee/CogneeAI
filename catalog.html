@@ -155,14 +155,6 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted); margin-left: auto;
         }
-        .kw-list { display: flex; flex-wrap: wrap; gap: 6px; }
-        .kw-tag {
-            font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            background: rgba(79,195,247,.06); border: 1px solid rgba(79,195,247,.15);
-            border-radius: 3px; padding: 2px 8px; color: var(--accent);
-            letter-spacing: .04em; cursor: pointer; transition: background .15s;
-        }
-        .kw-tag:hover { background: rgba(79,195,247,.14); }
 
         /* ЗАГРУЗКА */
         .loading-state {
@@ -350,16 +342,6 @@ window.clearSearch = function() {
     document.getElementById('search-input').focus();
 };
 
-// Поиск по тегу при клике на него
-window.searchByTag = function(tag) {
-    const input = document.getElementById('search-input');
-    input.value = tag;
-    _query = tag;
-    toggleClear(tag);
-    loadArticles(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
 // ── ЗАГРУЗКА ──────────────────────────────────────────────────────────────────
 async function loadArticles(reset) {
     if (_loading) return;
@@ -433,10 +415,6 @@ function buildCard(article) {
 
     const readMin = article.read_minutes || 1;
 
-    const kwHtml = (article.keywords || []).slice(0, 5).map(kw =>
-        `<span class="kw-tag" onclick="event.preventDefault();searchByTag('${_esc(kw)}')">${_esc(kw)}</span>`
-    ).join('');
-
     // Подсвечиваем совпадение в заголовке
     const titleHtml = _highlight(_esc(article.title || 'Без названия'), _query);
 
@@ -449,7 +427,6 @@ function buildCard(article) {
             ? `<div class="article-card-annotation">${_esc(article.annotation)}</div>`
             : ''}
         <div class="article-card-footer">
-            ${kwHtml ? `<div class="kw-list">${kwHtml}</div>` : ''}
             <div class="article-card-author">👤 ${_esc(article.author_name || 'Автор')}</div>
             <div class="article-card-date">${date}</div>
         </div>`;

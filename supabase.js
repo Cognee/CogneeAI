@@ -250,7 +250,7 @@
         if (!isAuthenticated()) return [];
         const res = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
-            '&select=id,title,annotation,keywords,published_at&order=published_at.desc');
+            '&select=id,title,annotation,published_at&order=published_at.desc');
         return Array.isArray(res) ? res : [];
     }
 
@@ -264,7 +264,7 @@
         // Запрос с полями v8.4
         const res = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
-            '&select=id,title,annotation,keywords,published_at,visibility,is_draft,slug' +
+            '&select=id,title,annotation,published_at,visibility,is_draft,slug' +
             '&order=published_at.desc');
 
         if (Array.isArray(res)) return res;
@@ -273,7 +273,7 @@
         console.warn('[CogneeSupabase v8.4.2] Поля v8.4 недоступны — используем fallback. Примените supabase_migration_v8_4.sql!');
         const fallback = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
-            '&select=id,title,annotation,keywords,published_at&order=published_at.desc');
+            '&select=id,title,annotation,published_at&order=published_at.desc');
 
         if (!Array.isArray(fallback)) return [];
 

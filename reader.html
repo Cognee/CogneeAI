@@ -76,19 +76,6 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted, #5a7090); letter-spacing: 0.04em;
         }
-        .kw-section {
-            max-width: var(--reader-max); margin: 14px auto 0; padding: 0 24px;
-            display: flex; flex-wrap: wrap; gap: 7px; align-items: center;
-        }
-        .kw-lbl {
-            font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted, #5a7090);
-        }
-        .kw-tag {
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
-            background: rgba(79,195,247,0.07); border: 1px solid rgba(79,195,247,0.18);
-            border-radius: 4px; padding: 3px 9px; color: #4FC3F7; letter-spacing: 0.03em;
-        }
 
         /* СОСТОЯНИЯ */
         .loading-state, .error-state, .private-state {
@@ -100,6 +87,9 @@
             border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 20px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Скрываем вертикальный прогрессбар adapter.js — в читалке есть свой горизонтальный */
+        #cognee-progress-bar { display: none !important; }
         .loading-text {
             font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted, #5a7090);
         }
@@ -164,7 +154,7 @@
         .vis-badge.private { background: rgba(124,77,255,0.12); color: #b39ddb; }
 
         @media (max-width: 600px) {
-            .article-meta, .kw-section, .share-bar { padding: 0 16px; }
+            .article-meta, .share-bar { padding: 0 16px; }
             .reader-nav { padding: 0 16px; }
             .private-state { padding: 40px 20px; }
         }
@@ -224,11 +214,6 @@
             <span class="meta-item" id="meta-read"></span>
             <span class="vis-badge" id="meta-vis-badge" style="display:none"></span>
         </div>
-    </div>
-
-    <!-- КЛЮЧЕВЫЕ СЛОВА -->
-    <div class="kw-section" id="kw-section" style="display:none">
-        <span class="kw-lbl">теги:</span>
     </div>
 
     <!-- КОНТЕНТ -->
@@ -334,17 +319,6 @@
         }
 
         document.getElementById('article-meta').style.display = 'block';
-
-        if (article.keywords && article.keywords.length) {
-            const kwSection = document.getElementById('kw-section');
-            article.keywords.forEach(kw => {
-                const tag = document.createElement('span');
-                tag.className = 'kw-tag';
-                tag.textContent = kw;
-                kwSection.appendChild(tag);
-            });
-            kwSection.style.display = 'flex';
-        }
 
         const main = document.getElementById('article-main');
         const simplifiedMap = buildSimplifiedMap(article.content_simple);

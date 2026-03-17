@@ -1,6 +1,6 @@
 <!-- editor.html — v8.4.2 | Глобальная версия: 8.4 -->
 <!-- Блок 4: Редактор статей. Видимость (public/private), черновики, редактирование существующей статьи. -->
-<!-- Публикация через CogneeAI (Gemini): упрощение, ключевые слова, аннотация. -->
+<!-- Публикация через CogneeAI (Gemini): упрощение текста и аннотация. -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -237,13 +237,6 @@
             border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.65;
             color:var(--text); min-height:36px;
         }
-        .kw-list { display:flex; flex-wrap:wrap; gap:7px; }
-        .kw-tag {
-            font-family:'JetBrains Mono',monospace; font-size:11px;
-            background:rgba(79,195,247,.08); border:1px solid rgba(79,195,247,.2);
-            border-radius:4px; padding:3px 10px; color:var(--accent);
-            letter-spacing:.04em;
-        }
         .ai-idle {
             font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted);
         }
@@ -364,7 +357,7 @@
     <!-- РЕДАКТОР -->
     <div id="editor-body">
         <div class="page-title" id="page-title">Редактор статей</div>
-        <div class="page-sub">Пиши — CogneeAI создаст упрощённую версию, аннотацию и ключевые слова</div>
+        <div class="page-sub">Пиши — CogneeAI создаст упрощённую версию и аннотацию</div>
 
         <!-- БАННЕР РЕЖИМА РЕДАКТИРОВАНИЯ -->
         <div class="edit-banner" id="edit-banner">
@@ -441,7 +434,6 @@
                 <ul class="step-list" id="step-list">
                     <li class="step" id="step-parse">⟡ Разбивка на абзацы</li>
                     <li class="step" id="step-simplify">⟡ Упрощение текста через Gemini</li>
-                    <li class="step" id="step-keywords">⟡ Извлечение ключевых слов</li>
                     <li class="step" id="step-annotation">⟡ Создание аннотации</li>
                 </ul>
             </div>
@@ -450,10 +442,6 @@
                 <div class="result-block">
                     <div class="result-lbl">📝 Аннотация</div>
                     <div class="result-box" id="res-annotation">—</div>
-                </div>
-                <div class="result-block">
-                    <div class="result-lbl">🏷 Ключевые слова</div>
-                    <div class="result-box"><div class="kw-list" id="res-keywords"></div></div>
                 </div>
                 <div class="result-block">
                     <div class="result-lbl">📦 Упрощённые абзацы</div>
@@ -498,7 +486,6 @@
 const S = {
     aiDone:     false,
     simplified: [],   // [{original, simplified}]
-    keywords:   [],
     annotation: '',
     visibility: 'public',
     DRAFT_KEY:  'cognee_editor_draft',
@@ -554,14 +541,13 @@ async function checkEditMode() {
         if (article.visibility === 'private') selectVisibility('private');
 
         // Восстанавливаем AI-данные если есть
-        if (article.annotation || (article.keywords && article.keywords.length)) {
+        if (article.annotation) {
             S.annotation = article.annotation || '';
-            S.keywords   = article.keywords  || [];
             if (article.content_simple) {
                 try { S.simplified = JSON.parse(article.content_simple); } catch(e) {}
             }
             S.aiDone = true;
-            showAIResults(article.annotation, article.keywords, S.simplified.length);
+            showAIResults(article.annotation, [], S.simplified.length);
             document.getElementById('btn-publish').disabled = false;
         }
     } catch(e) {
@@ -673,7 +659,7 @@ window.saveDraft = async function() {
                 await window.CogneeSupabase.updateArticle(S.draftId, {
                     title, content,
                     content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                    keywords:   S.keywords.length   ? S.keywords   : undefined,
+                    keywords: [],
                     annotation: S.annotation        ? S.annotation  : undefined,
                     visibility: S.visibility,
                     is_draft:   true,
@@ -684,7 +670,7 @@ window.saveDraft = async function() {
                 const result = await window.CogneeSupabase.publishArticle({
                     title, content,
                     content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
-                    keywords:   S.keywords,
+                    keywords: [],
                     annotation: S.annotation,
                     visibility: S.visibility,
                     is_draft:   true,
@@ -731,7 +717,7 @@ window.processWithAI = async function() {
     document.getElementById('ai-results').classList.remove('vis');
     document.getElementById('ai-progress').classList.add('vis');
 
-    const steps = ['step-parse', 'step-simplify', 'step-keywords', 'step-annotation'];
+    const steps = ['step-parse', 'step-simplify', 'step-annotation'];
     steps.forEach(id => {
         const el = document.getElementById(id);
         el.className = 'step';
@@ -759,13 +745,7 @@ window.processWithAI = async function() {
         S.simplified = simplified;
         setStep('step-simplify', 'done');
 
-        // 3. Ключевые слова
-        setStep('step-keywords', 'active');
-        const keywords = await window.CogneeAI.extractKeywords(title + '\n\n' + content);
-        S.keywords = keywords;
-        setStep('step-keywords', 'done');
-
-        // 4. Аннотация
+        // 3. Аннотация
         setStep('step-annotation', 'active');
         const annotation = await window.CogneeAI.generateAnnotation(title, content);
         S.annotation = annotation;
@@ -773,7 +753,7 @@ window.processWithAI = async function() {
 
         S.aiDone = true;
         document.getElementById('ai-progress').classList.remove('vis');
-        showAIResults(annotation, keywords, simplified.length);
+        showAIResults(annotation, [], simplified.length);
         document.getElementById('btn-publish').disabled = false;
         showToast('✓ AI обработка завершена');
 
@@ -787,16 +767,8 @@ window.processWithAI = async function() {
     btn.disabled = false;
 };
 
-function showAIResults(annotation, keywords, simplifiedCount) {
+function showAIResults(annotation, _keywords, simplifiedCount) {
     document.getElementById('res-annotation').textContent  = annotation || '—';
-    const kwList = document.getElementById('res-keywords');
-    kwList.innerHTML = '';
-    (keywords || []).forEach(kw => {
-        const tag = document.createElement('span');
-        tag.className = 'kw-tag';
-        tag.textContent = kw;
-        kwList.appendChild(tag);
-    });
     document.getElementById('res-simplified-count').textContent =
         simplifiedCount > 0 ? `Упрощено абзацев: ${simplifiedCount}` : 'Упрощение не выполнено';
     document.getElementById('ai-results').classList.add('vis');
@@ -828,7 +800,7 @@ window.doPublish = async function() {
             await window.CogneeSupabase.updateArticle(S.editId, {
                 title, content,
                 content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                keywords:   S.keywords.length   ? S.keywords   : undefined,
+                keywords: [],
                 annotation: S.annotation        ? S.annotation  : undefined,
                 visibility: S.visibility,
                 is_draft:   false,
@@ -840,7 +812,7 @@ window.doPublish = async function() {
             await window.CogneeSupabase.updateArticle(S.draftId, {
                 title, content,
                 content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                keywords:   S.keywords.length   ? S.keywords   : undefined,
+                keywords: [],
                 annotation: S.annotation        ? S.annotation  : undefined,
                 visibility: S.visibility,
                 is_draft:   false,
@@ -863,7 +835,7 @@ window.doPublish = async function() {
             const result = await window.CogneeSupabase.publishArticle({
                 title, content,
                 content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
-                keywords:   S.keywords,
+                keywords: [],
                 annotation: S.annotation,
                 visibility: S.visibility,
                 is_draft:   false,
