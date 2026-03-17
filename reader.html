@@ -1,34 +1,29 @@
-<!-- reader.html — v8.5 | Глобальная версия: 8.5 -->
-<!-- Изменения v8.5: добавлены кнопки "Избранное" и "Пожаловаться", их логика, toast-уведомления -->
+<!-- reader.html — v8.5.1 | Глобальная версия: 8.5 -->
+<!-- Изменения v8.5.1: меню ⋮ перенесено в навбар (вверх), убран action-bar снизу.
+     Использует article-actions.js для дропдауна, избранного, жалоб. -->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cognee — Читалка</title>
-
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
     <link rel="shortcut icon" href="favicon/favicon.ico" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
-
-    <!-- ONNX Runtime для CogneeAI нейросети -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
-
     <link rel="stylesheet" href="styles.css">
     <style>
         :root { --reader-max: 720px; }
 
-        /* ── NAV ── */
         .reader-nav {
             position: sticky; top: 0; z-index: 100;
             background: rgba(15,15,15,0.92); backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(79,195,247,0.1);
-            padding: 0 24px; height: 52px;
-            display: flex; align-items: center; gap: 16px;
+            padding: 0 16px 0 24px; height: 52px;
+            display: flex; align-items: center; gap: 12px;
         }
         [data-theme="light"] .reader-nav { background: rgba(245,240,232,0.93); }
         .reader-nav-logo {
@@ -37,7 +32,7 @@
         }
         .reader-nav-title {
             font-size: 13px; color: var(--muted, #5a7090); font-style: italic;
-            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
         }
         .reader-nav-link {
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -45,48 +40,22 @@
             letter-spacing: 0.04em; flex-shrink: 0; transition: color 0.2s;
         }
         .reader-nav-link:hover { color: #4FC3F7; }
+        #nav-actions-wrap { flex-shrink: 0; display: flex; align-items: center; }
 
-        /* ── PROGRESS ── */
         .read-progress {
             position: fixed; top: 52px; left: 0; height: 2px; width: 0%;
             background: linear-gradient(90deg, #4FC3F7, #7C4DFF); z-index: 101; transition: width 0.1s;
         }
 
-        /* ── META ── */
-        .article-meta {
-            max-width: var(--reader-max); margin: 40px auto 0; padding: 0 24px;
-        }
-        .meta-badge {
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
-            text-transform: uppercase; letter-spacing: 0.1em; color: #4FC3F7; margin-bottom: 14px;
-        }
-        .article-title {
-            font-family: 'Unbounded', sans-serif;
-            font-size: clamp(22px, 4vw, 36px); font-weight: 700;
-            line-height: 1.25; letter-spacing: -0.03em; margin-bottom: 16px;
-        }
-        .article-annotation {
-            font-size: 16px; line-height: 1.65;
-            color: var(--muted, #5a7090); font-style: italic;
-            border-left: 3px solid #4FC3F7; padding-left: 16px; margin-bottom: 20px;
-        }
-        .meta-row {
-            display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-            padding-bottom: 20px; border-bottom: 1px solid rgba(79,195,247,0.1);
-        }
-        .meta-item {
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
-            color: var(--muted, #5a7090); letter-spacing: 0.04em;
-        }
-        .vis-badge {
-            font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            background: rgba(79,195,247,0.12); color: #4FC3F7;
-            border: 1px solid rgba(79,195,247,0.3); border-radius: 4px;
-            padding: 2px 8px; letter-spacing: 0.06em;
-        }
+        .article-meta { max-width: var(--reader-max); margin: 40px auto 0; padding: 0 24px; }
+        .meta-badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #4FC3F7; margin-bottom: 14px; }
+        .article-title { font-family: 'Unbounded', sans-serif; font-size: clamp(22px,4vw,36px); font-weight: 700; line-height: 1.25; letter-spacing: -0.03em; margin-bottom: 16px; }
+        .article-annotation { font-size: 16px; line-height: 1.65; color: var(--muted,#5a7090); font-style: italic; border-left: 3px solid #4FC3F7; padding-left: 16px; margin-bottom: 20px; }
+        .meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid rgba(79,195,247,0.1); }
+        .meta-item { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted,#5a7090); }
+        .vis-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: rgba(79,195,247,0.12); color: #4FC3F7; border: 1px solid rgba(79,195,247,0.3); border-radius: 4px; padding: 2px 8px; }
 
-        /* ── ARTICLE CONTENT ── */
-        .article { max-width: var(--reader-max); margin: 32px auto; padding: 0 24px; }
+        .article { max-width: var(--reader-max); margin: 32px auto 80px; padding: 0 24px; }
         .article-content-inner { font-family: 'Lora', serif; font-size: 18px; line-height: 1.8; }
         .article-content-inner p  { margin-bottom: 1.4em; }
         .article-content-inner h2 { font-family:'Unbounded',sans-serif; font-size:1.3em; font-weight:700; margin:2em 0 0.7em; letter-spacing:-0.02em; }
@@ -98,138 +67,20 @@
         .article-content-inner strong { font-weight:700; }
         .article-content-inner em { font-style:italic; }
 
-        /* ── STATES ── */
-        .loading-state, .error-state, .private-state {
-            max-width: var(--reader-max); margin: 80px auto; padding: 0 24px; text-align: center;
-        }
-        .loading-spinner {
-            width: 36px; height: 36px; border: 3px solid rgba(79,195,247,0.2);
-            border-top-color: #4FC3F7; border-radius: 50%;
-            animation: spin 0.8s linear infinite; margin: 0 auto 16px;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text   { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted,#5a7090); }
-        .error-icon, .private-icon { font-size: 48px; display: block; margin-bottom: 16px; }
-        .error-title, .private-title { font-family:'Unbounded',sans-serif; font-size:20px; font-weight:700; margin-bottom:8px; }
-        .error-sub, .private-sub    { font-size:14px; color:var(--muted,#5a7090); margin-bottom:24px; }
+        .loading-state,.error-state,.private-state { max-width:var(--reader-max); margin:80px auto; padding:0 24px; text-align:center; }
+        .loading-spinner { width:36px; height:36px; border:3px solid rgba(79,195,247,0.2); border-top-color:#4FC3F7; border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 16px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .loading-text { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted,#5a7090); }
+        .error-icon,.private-icon { font-size:48px; display:block; margin-bottom:16px; }
+        .error-title,.private-title { font-family:'Unbounded',sans-serif; font-size:20px; font-weight:700; margin-bottom:8px; }
+        .error-sub,.private-sub { font-size:14px; color:var(--muted,#5a7090); margin-bottom:24px; }
         .private-hint { font-size:13px; color:var(--muted,#5a7090); background:rgba(79,195,247,0.06); border:1px solid rgba(79,195,247,0.15); border-radius:8px; padding:16px; margin-bottom:24px; line-height:1.6; }
-        .btn-back, .btn-catalog {
-            display: inline-block; margin: 4px 8px;
-            padding: 10px 20px; border-radius: 8px; font-size: 13px;
-            text-decoration: none; transition: background 0.2s;
-        }
-        .btn-back    { background: rgba(79,195,247,0.1); color:#4FC3F7; border:1px solid rgba(79,195,247,0.3); }
-        .btn-catalog { background: rgba(124,77,255,0.1); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
-        .btn-back:hover    { background: rgba(79,195,247,0.2); }
-        .btn-catalog:hover { background: rgba(124,77,255,0.2); }
-
-        /* ── ACTION BAR (избранное + поделиться + пожаловаться) ── */
-        .action-bar {
-            max-width: var(--reader-max); margin: 32px auto 0; padding: 0 24px;
-            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-        }
-        .action-btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 8px 16px; border-radius: 8px; font-size: 13px;
-            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em;
-            border: 1px solid; cursor: pointer; transition: all 0.2s; background: none;
-        }
-        /* Избранное */
-        .action-btn.fav {
-            color: #FFB300; border-color: rgba(255,179,0,0.3);
-            background: rgba(255,179,0,0.06);
-        }
-        .action-btn.fav:hover    { background: rgba(255,179,0,0.14); }
-        .action-btn.fav.active   { background: rgba(255,179,0,0.18); border-color:rgba(255,179,0,0.6); }
-        .action-btn.fav.loading  { opacity: 0.5; pointer-events: none; }
-
-        /* Поделиться */
-        .action-btn.share  { color:#4FC3F7; border-color:rgba(79,195,247,0.3); background:rgba(79,195,247,0.06); }
-        .action-btn.share:hover  { background:rgba(79,195,247,0.14); }
-        .action-btn.share-tg { color:#29B6F6; border-color:rgba(41,182,246,0.3); background:rgba(41,182,246,0.06); }
-        .action-btn.share-tg:hover { background:rgba(41,182,246,0.14); }
-
-        /* Пожаловаться */
-        .action-btn.report { color:#FF5252; border-color:rgba(255,82,82,0.3); background:rgba(255,82,82,0.06); margin-left: auto; }
-        .action-btn.report:hover  { background:rgba(255,82,82,0.14); }
-        .action-btn.report:disabled { opacity:0.4; cursor:not-allowed; pointer-events:none; }
-
-        .fav-count {
-            font-size:11px; color:var(--muted,#5a7090);
-            font-family:'JetBrains Mono',monospace; margin-left:2px;
-        }
-
-        /* ── МОДАЛЬНОЕ ОКНО ЖАЛОБЫ ── */
-        .modal-overlay {
-            display: none; position: fixed; inset: 0; z-index: 500;
-            background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
-            align-items: center; justify-content: center;
-        }
-        .modal-overlay.open { display: flex; }
-        .modal-box {
-            background: #141820; border: 1px solid rgba(79,195,247,0.15);
-            border-radius: 16px; padding: 28px; width: min(480px, calc(100vw - 32px));
-            box-shadow: 0 24px 48px rgba(0,0,0,0.5);
-        }
-        [data-theme="light"] .modal-box { background: #fff; border-color:rgba(0,0,0,0.1); }
-        .modal-title {
-            font-family:'Unbounded',sans-serif; font-size:16px; font-weight:700;
-            margin-bottom:6px; color:#FF5252;
-        }
-        .modal-sub { font-size:13px; color:var(--muted,#5a7090); margin-bottom:20px; }
-        .report-options { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
-        .report-option {
-            display:flex; align-items:center; gap:10px;
-            padding:10px 14px; border-radius:8px; cursor:pointer;
-            border:1px solid rgba(255,82,82,0.2); background:rgba(255,82,82,0.04);
-            transition: background 0.15s, border-color 0.15s;
-            font-size:13px;
-        }
-        .report-option input[type=radio] { accent-color:#FF5252; flex-shrink:0; }
-        .report-option:hover    { background:rgba(255,82,82,0.1); border-color:rgba(255,82,82,0.4); }
-        .report-option.selected { background:rgba(255,82,82,0.14); border-color:rgba(255,82,82,0.6); }
-        .report-comment {
-            width:100%; box-sizing:border-box; padding:10px 14px;
-            background:rgba(255,255,255,0.04); border:1px solid rgba(79,195,247,0.15);
-            border-radius:8px; color:inherit; font-size:13px; resize:vertical; min-height:72px;
-            font-family:inherit; margin-bottom:16px;
-            transition: border-color 0.2s;
-        }
-        [data-theme="light"] .report-comment { background:rgba(0,0,0,0.04); }
-        .report-comment:focus { outline:none; border-color:rgba(255,82,82,0.5); }
-        .modal-btns { display:flex; gap:10px; justify-content:flex-end; }
-        .modal-btn {
-            padding:9px 20px; border-radius:8px; font-size:13px;
-            font-family:'JetBrains Mono',monospace; cursor:pointer;
-            border:1px solid; transition:all 0.2s;
-        }
-        .modal-btn.cancel  { background:none; color:var(--muted,#5a7090); border-color:rgba(255,255,255,0.1); }
-        .modal-btn.cancel:hover { background:rgba(255,255,255,0.06); }
-        .modal-btn.submit  { background:rgba(255,82,82,0.12); color:#FF5252; border-color:rgba(255,82,82,0.4); }
-        .modal-btn.submit:hover  { background:rgba(255,82,82,0.22); }
-        .modal-btn.submit:disabled { opacity:0.4; cursor:not-allowed; }
-
-        /* ── TOAST ── */
-        #toast-container {
-            position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
-            z-index:600; display:flex; flex-direction:column; align-items:center; gap:8px;
-            pointer-events:none;
-        }
-        .toast {
-            padding:10px 20px; border-radius:10px; font-size:13px;
-            font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;
-            pointer-events:none; animation:toastIn 0.25s ease;
-            border:1px solid; backdrop-filter:blur(8px);
-        }
-        .toast.ok  { background:rgba(79,195,247,0.14); color:#4FC3F7; border-color:rgba(79,195,247,0.3); }
-        .toast.err { background:rgba(255,82,82,0.14); color:#FF5252; border-color:rgba(255,82,82,0.3); }
-        .toast.warn { background:rgba(255,179,0,0.14); color:#FFB300; border-color:rgba(255,179,0,0.3); }
-        @keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+        .btn-back    { display:inline-block; margin:4px 8px; padding:10px 20px; border-radius:8px; font-size:13px; text-decoration:none; background:rgba(79,195,247,0.1); color:#4FC3F7; border:1px solid rgba(79,195,247,0.3); }
+        .btn-catalog { display:inline-block; margin:4px 8px; padding:10px 20px; border-radius:8px; font-size:13px; text-decoration:none; background:rgba(124,77,255,0.1); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
     </style>
 </head>
 <body data-theme="dark">
-
-    <div id="kim-display" title="Когнитивный Индекс Момента — CogneeAI адаптирует текст">КИМ: —</div>
+    <div id="kim-display" title="Когнитивный Индекс Момента — CogneeAI">КИМ: —</div>
     <a id="dash-link" href="dashboard.html" title="Когнитивный профиль">📊</a>
     <a id="profile-link" href="profile.html" title="Профиль">👤</a>
 
@@ -240,37 +91,34 @@
         <span class="reader-nav-title" id="nav-title">Загрузка...</span>
         <a class="reader-nav-link" href="catalog.html">📚 Каталог</a>
         <a class="reader-nav-link" href="editor.html">+ Написать</a>
+        <div id="nav-actions-wrap"></div>
     </nav>
 
-    <!-- LOADING -->
     <div class="loading-state" id="loading-state">
         <div class="loading-spinner"></div>
         <div class="loading-text">Загружаем статью...</div>
     </div>
 
-    <!-- ERROR -->
     <div class="error-state" id="error-state" style="display:none">
         <span class="error-icon">📭</span>
         <div class="error-title">Статья не найдена</div>
         <div class="error-sub">Возможно, ссылка устарела или статья была удалена</div>
         <a class="btn-back" href="index.html">← На главную</a>
-        <a class="btn-catalog" href="catalog.html">📚 Каталог статей</a>
+        <a class="btn-catalog" href="catalog.html">📚 Каталог</a>
     </div>
 
-    <!-- PRIVATE -->
     <div class="private-state" id="private-state" style="display:none">
         <span class="private-icon">🔒</span>
         <div class="private-title">Статья закрыта</div>
-        <div class="private-sub">Эта статья приватная — автор поделился ею только<br>по секретной ссылке</div>
+        <div class="private-sub">Эта статья приватная — автор поделился ею только по секретной ссылке</div>
         <div class="private-hint">
             💡 Если у тебя есть ссылка вида <strong>reader.html?id=s3ihe7hl</strong> — открой её напрямую.<br>
             Числовой ID приватных статей не работает намеренно.
         </div>
         <a class="btn-back" href="index.html">← На главную</a>
-        <a class="btn-catalog" href="catalog.html">📚 Каталог статей</a>
+        <a class="btn-catalog" href="catalog.html">📚 Каталог</a>
     </div>
 
-    <!-- МЕТАДАННЫЕ -->
     <div class="article-meta" id="article-meta" style="display:none">
         <div class="meta-badge">📄 Статья</div>
         <h1 class="article-title" id="meta-title"></h1>
@@ -283,414 +131,110 @@
         </div>
     </div>
 
-    <!-- КОНТЕНТ -->
     <div class="article" id="article-content" style="display:none">
         <main id="article-main" class="article-content-inner"></main>
     </div>
 
-    <!-- ACTION BAR: избранное + поделиться + пожаловаться -->
-    <div class="action-bar" id="action-bar" style="display:none">
-        <!-- Избранное -->
-        <button class="action-btn fav" id="btn-favorite" onclick="toggleFavorite()">
-            <span id="fav-icon">☆</span>
-            <span id="fav-label">В избранное</span>
-            <span class="fav-count" id="fav-count"></span>
-        </button>
-
-        <!-- Поделиться -->
-        <button class="action-btn share" id="btn-copy-link" onclick="copyArticleLink()">
-            🔗 Скопировать ссылку
-        </button>
-        <button class="action-btn share-tg" onclick="shareToTelegram()">
-            ✈ Telegram
-        </button>
-
-        <!-- Пожаловаться (правая сторона) -->
-        <button class="action-btn report" id="btn-report" onclick="openReportModal()">
-            🚩 Пожаловаться
-        </button>
-    </div>
-
-    <!-- МОДАЛЬНОЕ ОКНО ЖАЛОБЫ -->
-    <div class="modal-overlay" id="report-modal" onclick="handleModalOverlayClick(event)">
-        <div class="modal-box">
-            <div class="modal-title">🚩 Пожаловаться на статью</div>
-            <div class="modal-sub">Выбери причину — мы рассмотрим жалобу в течение 24 часов</div>
-
-            <div class="report-options" id="report-options">
-                <label class="report-option" onclick="selectReason(this,'spam')">
-                    <input type="radio" name="report-reason" value="spam"> Спам или реклама
-                </label>
-                <label class="report-option" onclick="selectReason(this,'misinformation')">
-                    <input type="radio" name="report-reason" value="misinformation"> Недостоверная информация
-                </label>
-                <label class="report-option" onclick="selectReason(this,'offensive')">
-                    <input type="radio" name="report-reason" value="offensive"> Оскорбительный контент
-                </label>
-                <label class="report-option" onclick="selectReason(this,'plagiarism')">
-                    <input type="radio" name="report-reason" value="plagiarism"> Плагиат
-                </label>
-                <label class="report-option" onclick="selectReason(this,'other')">
-                    <input type="radio" name="report-reason" value="other"> Другое
-                </label>
-            </div>
-
-            <textarea class="report-comment" id="report-comment"
-                placeholder="Дополнительный комментарий (необязательно)..." maxlength="500"></textarea>
-
-            <div class="modal-btns">
-                <button class="modal-btn cancel" onclick="closeReportModal()">Отмена</button>
-                <button class="modal-btn submit" id="btn-submit-report" onclick="submitReport()" disabled>
-                    Отправить жалобу
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast контейнер -->
-    <div id="toast-container"></div>
-
     <script src="config.js" onerror="console.warn('[Cognee] config.js не найден')"></script>
     <script src="storage.js"></script>
     <script src="supabase.js"></script>
+    <script src="article-actions.js"></script>
     <script src="gemini.js"></script>
     <script src="sensor.js"></script>
     <script src="adapter.js"></script>
-
     <script>
-    // reader.js inline — v8.5
     (function(){
     'use strict';
 
-    let currentArticle = null;
-    let currentArticleId = null;
-    let _isFavorited = false;
-    let _selectedReason = null;
-
-    // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────────────────
     window.addEventListener('DOMContentLoaded', async () => {
-        const params = new URLSearchParams(location.search);
-        const id     = params.get('id');
+        CogneeActions.initToastContainer();
 
+        const id = new URLSearchParams(location.search).get('id');
         if (!id) { showError(); return; }
 
         try {
             await CogneeSupabase.init();
             const article = await CogneeSupabase.getArticleById(id);
+            if (!article)         { showError();   return; }
+            if (article._private) { showPrivate(); return; }
 
-            if (!article)           { showError();   return; }
-            if (article._private)   { showPrivate(); return; }
-
-            currentArticle   = article;
-            currentArticleId = article.id;
             renderArticle(article);
 
-            // Загружаем состояние избранного и счётчик параллельно
-            await Promise.all([
-                loadFavoriteState(article.id),
-                loadFavoritesCount(article.id),
-            ]);
+            const me      = CogneeSupabase.getCurrentUser();
+            const isOwner = !!(me && me.id === article.user_id);
 
-            // Показываем action bar только если статья загружена
-            document.getElementById('action-bar').style.display = 'flex';
-
-            // Блокируем кнопку жалобы если не авторизован
-            if (!CogneeSupabase.isAuthenticated()) {
-                const btn = document.getElementById('btn-report');
-                btn.title = 'Войдите, чтобы пожаловаться';
-                btn.disabled = true;
-            }
+            CogneeActions.mountMenu(document.getElementById('nav-actions-wrap'), {
+                articleId:    article.id,
+                articleTitle: article.title,
+                articleUrl:   location.href,
+                isOwner:      isOwner,
+                onDelete:     () => { location.href = 'profile.html'; },
+            });
 
         } catch(e) {
-            console.error('[Cognee reader v8.5]', e);
+            console.error('[Cognee reader v8.5.1]', e);
             showError();
         }
     });
 
-    // ── РЕНДЕР СТАТЬИ ─────────────────────────────────────────────────────────
-    function renderArticle(article) {
-        document.title = article.title + ' — Cognee';
-        document.getElementById('nav-title').textContent = article.title;
+    function renderArticle(a) {
+        document.title = a.title + ' — Cognee';
+        document.getElementById('nav-title').textContent   = a.title;
+        document.getElementById('meta-title').textContent  = a.title;
+        document.getElementById('meta-author').textContent = '✍ ' + (a.author_name || 'Автор');
+        document.getElementById('meta-date').textContent   =
+            a.published_at ? '📅 ' + new Date(a.published_at).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}) : '';
 
-        // Мета
-        document.getElementById('meta-title').textContent = article.title;
-        document.getElementById('meta-author').textContent = '✍ ' + (article.author_name || 'Автор');
-        document.getElementById('meta-date').textContent   = formatDate(article.published_at);
+        const words = (a.content||'').trim().split(/\s+/).length;
+        document.getElementById('meta-read').textContent = '⏱ ' + Math.max(1,Math.round(words/200)) + ' мин';
 
-        const words    = (article.content || '').trim().split(/\s+/).length;
-        const readMins = Math.max(1, Math.round(words / 200));
-        document.getElementById('meta-read').textContent = '⏱ ' + readMins + ' мин';
-
-        if (article.annotation) {
-            const ann = document.getElementById('meta-annotation');
-            ann.textContent    = article.annotation;
-            ann.style.display  = 'block';
+        if (a.annotation) {
+            const el = document.getElementById('meta-annotation');
+            el.textContent = a.annotation; el.style.display = 'block';
+        }
+        if (a.visibility === 'private') {
+            const el = document.getElementById('meta-vis-badge');
+            el.textContent = '🔒 приватная'; el.style.display = 'inline-block';
         }
 
-        if (article.visibility === 'private') {
-            const badge = document.getElementById('meta-vis-badge');
-            badge.textContent  = '🔒 приватная';
-            badge.style.display = 'inline-block';
-        }
-
-        document.getElementById('article-meta').style.display = 'block';
-
-        // Контент
-        document.getElementById('article-main').innerHTML = renderMarkdown(article.content || '');
+        document.getElementById('article-meta').style.display   = 'block';
+        document.getElementById('article-main').innerHTML        = mdToHtml(a.content||'');
         document.getElementById('article-content').style.display = 'block';
+        document.getElementById('loading-state').style.display  = 'none';
 
-        document.getElementById('loading-state').style.display = 'none';
-        setupReadProgress();
-    }
-
-    // ── ИЗБРАННОЕ ─────────────────────────────────────────────────────────────
-    async function loadFavoriteState(articleId) {
-        if (!CogneeSupabase.isAuthenticated()) return;
-        try {
-            const res = await CogneeSupabase._dbFetch('GET',
-                '/rest/v1/favorites?article_id=eq.' + articleId +
-                '&user_id=eq.' + CogneeSupabase.getCurrentUser().id +
-                '&select=id');
-            _isFavorited = Array.isArray(res) && res.length > 0;
-            updateFavBtn(_isFavorited);
-        } catch(e) {}
-    }
-
-    async function loadFavoritesCount(articleId) {
-        try {
-            const res = await CogneeSupabase._rpc('get_favorites_count', { p_article_id: articleId });
-            const count = (res && res[0] && res[0].get_favorites_count) ? res[0].get_favorites_count : null;
-            if (count !== null && count > 0) {
-                document.getElementById('fav-count').textContent = count;
-            }
-        } catch(e) {}
-    }
-
-    window.toggleFavorite = async function() {
-        if (!CogneeSupabase.isAuthenticated()) {
-            showToast('Войдите в аккаунт, чтобы добавить в избранное', 'warn');
-            setTimeout(() => { location.href = 'auth.html?redirect=' + encodeURIComponent(location.href); }, 1200);
-            return;
-        }
-        const btn = document.getElementById('btn-favorite');
-        btn.classList.add('loading');
-        try {
-            const userId    = CogneeSupabase.getCurrentUser().id;
-            const articleId = currentArticleId;
-
-            if (_isFavorited) {
-                // Удаляем из избранного
-                await CogneeSupabase._dbFetch('DELETE',
-                    '/rest/v1/favorites?article_id=eq.' + articleId +
-                    '&user_id=eq.' + userId);
-                _isFavorited = false;
-                updateFavBtn(false);
-                bumpFavCount(-1);
-                showToast('Убрано из избранного', 'ok');
-            } else {
-                // Добавляем в избранное
-                await CogneeSupabase._dbFetch('POST', '/rest/v1/favorites',
-                    [{ user_id: userId, article_id: articleId }]);
-                _isFavorited = true;
-                updateFavBtn(true);
-                bumpFavCount(+1);
-                showToast('★ Добавлено в избранное!', 'ok');
-            }
-        } catch(e) {
-            console.error('[Cognee reader v8.5] toggleFavorite:', e);
-            showToast('Ошибка. Попробуйте снова', 'err');
-        } finally {
-            btn.classList.remove('loading');
-        }
-    };
-
-    function updateFavBtn(active) {
-        const btn   = document.getElementById('btn-favorite');
-        const icon  = document.getElementById('fav-icon');
-        const label = document.getElementById('fav-label');
-        if (active) {
-            btn.classList.add('active');
-            icon.textContent  = '★';
-            label.textContent = 'В избранном';
-        } else {
-            btn.classList.remove('active');
-            icon.textContent  = '☆';
-            label.textContent = 'В избранное';
-        }
-    }
-
-    function bumpFavCount(delta) {
-        const el  = document.getElementById('fav-count');
-        const cur = parseInt(el.textContent || '0', 10);
-        const nxt = Math.max(0, cur + delta);
-        el.textContent = nxt > 0 ? nxt : '';
-    }
-
-    // ── ЖАЛОБА ────────────────────────────────────────────────────────────────
-    window.openReportModal = function() {
-        if (!CogneeSupabase.isAuthenticated()) {
-            showToast('Войдите в аккаунт, чтобы пожаловаться', 'warn');
-            return;
-        }
-        _selectedReason = null;
-        document.querySelectorAll('.report-option').forEach(o => o.classList.remove('selected'));
-        document.getElementById('report-comment').value = '';
-        document.getElementById('btn-submit-report').disabled = true;
-        document.getElementById('report-modal').classList.add('open');
-    };
-
-    window.closeReportModal = function() {
-        document.getElementById('report-modal').classList.remove('open');
-    };
-
-    window.handleModalOverlayClick = function(e) {
-        if (e.target === document.getElementById('report-modal')) closeReportModal();
-    };
-
-    window.selectReason = function(el, reason) {
-        _selectedReason = reason;
-        document.querySelectorAll('.report-option').forEach(o => o.classList.remove('selected'));
-        el.classList.add('selected');
-        document.getElementById('btn-submit-report').disabled = false;
-    };
-
-    window.submitReport = async function() {
-        if (!_selectedReason) return;
-
-        const submitBtn = document.getElementById('btn-submit-report');
-        submitBtn.disabled    = true;
-        submitBtn.textContent = 'Отправляем...';
-
-        try {
-            const userId  = CogneeSupabase.getCurrentUser().id;
-            const comment = document.getElementById('report-comment').value.trim() || null;
-
-            await CogneeSupabase._dbFetch('POST', '/rest/v1/reports', [{
-                article_id:  currentArticleId,
-                reporter_id: userId,
-                reason:      _selectedReason,
-                comment:     comment,
-                status:      'pending',
-            }]);
-
-            closeReportModal();
-            showToast('Жалоба отправлена. Спасибо!', 'ok');
-
-            // Блокируем кнопку — нельзя жаловаться дважды
-            const reportBtn = document.getElementById('btn-report');
-            reportBtn.disabled    = true;
-            reportBtn.textContent = '✓ Жалоба отправлена';
-
-        } catch(e) {
-            console.error('[Cognee reader v8.5] submitReport:', e);
-            // Обрабатываем duplicate (unique constraint)
-            const msg = String(e?.message || '');
-            if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('23505')) {
-                closeReportModal();
-                showToast('Вы уже жаловались на эту статью', 'warn');
-                document.getElementById('btn-report').disabled    = true;
-                document.getElementById('btn-report').textContent = '✓ Жалоба уже отправлена';
-            } else {
-                showToast('Ошибка при отправке жалобы', 'err');
-                submitBtn.disabled    = false;
-                submitBtn.textContent = 'Отправить жалобу';
-            }
-        }
-    };
-
-    // ── ПОДЕЛИТЬСЯ ────────────────────────────────────────────────────────────
-    window.copyArticleLink = function() {
-        navigator.clipboard.writeText(location.href).then(() => {
-            const btn = document.getElementById('btn-copy-link');
-            const orig = btn.textContent;
-            btn.textContent = '✓ Скопировано!';
-            setTimeout(() => { btn.textContent = orig; }, 2500);
-            showToast('Ссылка скопирована', 'ok');
-        }).catch(() => {});
-    };
-
-    window.shareToTelegram = function() {
-        const text = encodeURIComponent((currentArticle?.title || 'Статья') + ' — Cognee');
-        const url  = encodeURIComponent(location.href);
-        window.open('https://t.me/share/url?url=' + url + '&text=' + text, '_blank');
-    };
-
-    // ── TOAST ─────────────────────────────────────────────────────────────────
-    window.showToast = function(msg, type) {
-        type = type || 'ok';
-        const container = document.getElementById('toast-container');
-        const el = document.createElement('div');
-        el.className   = 'toast ' + type;
-        el.textContent = msg;
-        container.appendChild(el);
-        setTimeout(() => {
-            el.style.transition = 'opacity 0.3s';
-            el.style.opacity    = '0';
-            setTimeout(() => el.remove(), 300);
-        }, 3000);
-    };
-
-    // ── УТИЛИТЫ ───────────────────────────────────────────────────────────────
-    function formatDate(iso) {
-        if (!iso) return '';
-        const d = new Date(iso);
-        return '📅 ' + d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
-    }
-
-    function renderMarkdown(text) {
-        return text
-            .split(/\n\s*\n/)
-            .map(block => {
-                const b = block.trim();
-                if (!b) return '';
-                if (/^#{2}\s/.test(b)) return '<h2>' + escHtml(b.replace(/^#{2}\s/,'')) + '</h2>';
-                if (/^#{3}\s/.test(b)) return '<h3>' + escHtml(b.replace(/^#{3}\s/,'')) + '</h3>';
-                if (/^>\s/.test(b))    return '<blockquote>' + escHtml(b.replace(/^>\s/,'')) + '</blockquote>';
-                if (/^---$/.test(b))   return '<hr>';
-                if (/^[*-]\s/.test(b)) {
-                    const items = b.split('\n')
-                        .filter(l => /^[*-]\s/.test(l.trim()))
-                        .map(l => '<li>' + inlineFormat(escHtml(l.replace(/^[*-]\s/,''))) + '</li>')
-                        .join('');
-                    return '<ul>' + items + '</ul>';
-                }
-                return '<p>' + inlineFormat(escHtml(b)) + '</p>';
-            })
-            .join('\n');
-    }
-
-    function escHtml(s) {
-        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    function inlineFormat(s) {
-        return s
-            .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-            .replace(/_(.+?)_/g,'<em>$1</em>');
-    }
-
-    function setupReadProgress() {
+        // Полоска прогресса
         const bar = document.getElementById('read-progress');
         window.addEventListener('scroll', () => {
-            const scrollTop = window.scrollY;
-            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            bar.style.width = (docHeight > 0 ? (scrollTop / docHeight) * 100 : 0) + '%';
+            const d = document.documentElement.scrollHeight - window.innerHeight;
+            bar.style.width = (d > 0 ? (window.scrollY/d)*100 : 0) + '%';
         }, { passive: true });
     }
+
+    function mdToHtml(text) {
+        return text.split(/\n\s*\n/).map(b => {
+            b = b.trim(); if (!b) return '';
+            if (/^#{2}\s/.test(b)) return '<h2>'+e(b.replace(/^#{2}\s/,''))+'</h2>';
+            if (/^#{3}\s/.test(b)) return '<h3>'+e(b.replace(/^#{3}\s/,''))+'</h3>';
+            if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
+            if (/^---$/.test(b))   return '<hr>';
+            if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
+            return '<p>'+fmt(e(b))+'</p>';
+        }).join('');
+    }
+    function e(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function fmt(s){ return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>'); }
 
     function showError() {
         document.getElementById('loading-state').style.display = 'none';
         document.getElementById('error-state').style.display   = 'block';
         document.getElementById('nav-title').textContent = 'Статья не найдена';
     }
-
     function showPrivate() {
         document.getElementById('loading-state').style.display  = 'none';
         document.getElementById('private-state').style.display  = 'block';
         document.getElementById('nav-title').textContent = 'Приватная статья';
         document.title = 'Закрытая статья — Cognee';
     }
-
     })();
     </script>
 </body>
