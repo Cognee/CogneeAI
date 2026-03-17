@@ -1,0 +1,495 @@
+<!-- moderation.html — v8.5 | Глобальная версия: 8.5 -->
+<!-- Новый файл: панель модератора — просмотр жалоб, принятие решений -->
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognee — Модерация</title>
+
+    <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="shortcut icon" href="favicon/favicon.ico" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+        /* ── HEADER ── */
+        .mod-header {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(15,15,15,0.95); backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,82,82,0.2);
+            padding: 0 28px; height: 56px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .mod-logo {
+            font-family: 'Unbounded', sans-serif; font-size: 15px; font-weight: 700;
+            color: #4FC3F7; text-decoration: none; letter-spacing: -0.02em;
+        }
+        .mod-title-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            background: rgba(255,82,82,0.12); color: #FF5252;
+            border: 1px solid rgba(255,82,82,0.3); border-radius: 4px;
+            padding: 3px 10px; letter-spacing: 0.06em;
+        }
+        .mod-user {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: var(--muted, #5a7090); margin-left: auto;
+        }
+        .mod-logout-btn {
+            font-size: 12px; padding: 5px 12px; border-radius: 6px;
+            background: none; border: 1px solid rgba(255,82,82,0.3);
+            color: #FF5252; cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            transition: background 0.2s;
+        }
+        .mod-logout-btn:hover { background: rgba(255,82,82,0.1); }
+
+        /* ── LAYOUT ── */
+        .mod-layout {
+            max-width: 1100px; margin: 0 auto; padding: 32px 24px;
+        }
+
+        /* ── ACCESS DENIED ── */
+        .access-denied {
+            text-align: center; padding: 80px 24px; max-width: 480px; margin: 0 auto;
+        }
+        .access-denied-icon { font-size: 56px; display: block; margin-bottom: 16px; }
+        .access-denied-title {
+            font-family: 'Unbounded', sans-serif; font-size: 22px; font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .access-denied-sub { font-size: 14px; color: var(--muted, #5a7090); margin-bottom: 24px; }
+
+        /* ── STATS ROW ── */
+        .stats-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px; margin-bottom: 28px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px; padding: 14px 18px;
+        }
+        .stat-card-val {
+            font-family: 'Unbounded', sans-serif; font-size: 28px; font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .stat-card-lbl {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: var(--muted, #5a7090); letter-spacing: 0.04em;
+        }
+        .stat-card.pending  .stat-card-val { color: #FFB300; }
+        .stat-card.reviewed .stat-card-val { color: #4FC3F7; }
+        .stat-card.resolved .stat-card-val { color: #69F0AE; }
+        .stat-card.dismissed .stat-card-val { color: var(--muted, #5a7090); }
+
+        /* ── FILTERS ── */
+        .filter-row {
+            display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-btn {
+            padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em;
+            cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+            background: none; color: var(--muted, #5a7090); transition: all 0.15s;
+        }
+        .filter-btn:hover  { background: rgba(255,255,255,0.06); color: inherit; }
+        .filter-btn.active { background: rgba(255,179,0,0.12); color: #FFB300; border-color: rgba(255,179,0,0.4); }
+        .reload-btn {
+            margin-left: auto; padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            font-family: 'JetBrains Mono', monospace; background: rgba(79,195,247,0.1);
+            color: #4FC3F7; border: 1px solid rgba(79,195,247,0.3); cursor: pointer;
+            transition: background 0.2s;
+        }
+        .reload-btn:hover { background: rgba(79,195,247,0.2); }
+
+        /* ── REPORT CARDS ── */
+        .reports-list { display: flex; flex-direction: column; gap: 12px; }
+        .report-card {
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px; padding: 18px 20px; transition: border-color 0.2s;
+        }
+        .report-card:hover { border-color: rgba(255,82,82,0.2); }
+        .report-card-head {
+            display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px;
+        }
+        .reason-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+        }
+        .reason-spam        { background:rgba(255,82,82,0.12); color:#FF5252; border:1px solid rgba(255,82,82,0.3); }
+        .reason-misinformation { background:rgba(255,179,0,0.12); color:#FFB300; border:1px solid rgba(255,179,0,0.3); }
+        .reason-offensive   { background:rgba(229,57,53,0.12); color:#EF5350; border:1px solid rgba(229,57,53,0.3); }
+        .reason-plagiarism  { background:rgba(124,77,255,0.12); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
+        .reason-other       { background:rgba(144,164,174,0.12); color:#90A4AE; border:1px solid rgba(144,164,174,0.3); }
+
+        .report-article-link {
+            font-size: 14px; font-weight: 600; color: #4FC3F7;
+            text-decoration: none; flex: 1;
+        }
+        .report-article-link:hover { text-decoration: underline; }
+        .report-status-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            padding: 3px 8px; border-radius: 4px; flex-shrink: 0;
+            margin-left: auto;
+        }
+        .status-pending   { background:rgba(255,179,0,0.1); color:#FFB300; border:1px solid rgba(255,179,0,0.3); }
+        .status-reviewed  { background:rgba(79,195,247,0.1); color:#4FC3F7; border:1px solid rgba(79,195,247,0.3); }
+        .status-resolved  { background:rgba(105,240,174,0.1); color:#69F0AE; border:1px solid rgba(105,240,174,0.3); }
+        .status-dismissed { background:rgba(144,164,174,0.1); color:#90A4AE; border:1px solid rgba(144,164,174,0.3); }
+
+        .report-meta {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: var(--muted, #5a7090); margin-bottom: 8px; display: flex; gap: 16px; flex-wrap: wrap;
+        }
+        .report-comment-text {
+            font-size: 13px; color: var(--muted, #5a7090); font-style: italic;
+            background: rgba(255,255,255,0.03); border-left: 2px solid rgba(255,82,82,0.3);
+            padding: 6px 12px; border-radius: 0 6px 6px 0; margin-bottom: 12px;
+        }
+
+        /* Кнопки действий */
+        .report-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .act-btn {
+            padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            font-family: 'JetBrains Mono', monospace; cursor: pointer;
+            border: 1px solid; transition: all 0.15s; background: none;
+        }
+        .act-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .act-btn.reviewed  { color:#4FC3F7; border-color:rgba(79,195,247,0.3); }
+        .act-btn.reviewed:hover { background:rgba(79,195,247,0.1); }
+        .act-btn.resolved  { color:#69F0AE; border-color:rgba(105,240,174,0.3); }
+        .act-btn.resolved:hover { background:rgba(105,240,174,0.1); }
+        .act-btn.resolved-hide { color:#FF5252; border-color:rgba(255,82,82,0.3); }
+        .act-btn.resolved-hide:hover { background:rgba(255,82,82,0.1); }
+        .act-btn.dismissed { color:var(--muted,#5a7090); border-color:rgba(255,255,255,0.1); }
+        .act-btn.dismissed:hover { background:rgba(255,255,255,0.06); }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center; padding: 60px 20px;
+            color: var(--muted, #5a7090); font-size: 14px;
+        }
+        .empty-state-icon { font-size: 40px; display: block; margin-bottom: 12px; }
+
+        /* Loading */
+        .mod-spinner {
+            width: 32px; height: 32px; border: 3px solid rgba(79,195,247,0.15);
+            border-top-color: #4FC3F7; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 40px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast */
+        #toast-container {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: 600; display: flex; flex-direction: column; align-items: center; gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 9px 18px; border-radius: 9px; font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            pointer-events: none; animation: toastIn 0.2s ease;
+            border: 1px solid; backdrop-filter: blur(8px);
+        }
+        .toast.ok   { background:rgba(105,240,174,0.12); color:#69F0AE; border-color:rgba(105,240,174,0.3); }
+        .toast.err  { background:rgba(255,82,82,0.12); color:#FF5252; border-color:rgba(255,82,82,0.3); }
+        .toast.warn { background:rgba(255,179,0,0.12); color:#FFB300; border-color:rgba(255,179,0,0.3); }
+        @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+        /* Reason labels */
+        .reason-labels {
+            spam:'Спам', misinformation:'Дезинформация',
+            offensive:'Оскорбления', plagiarism:'Плагиат', other:'Другое'
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div id="toast-container"></div>
+
+    <!-- HEADER -->
+    <header class="mod-header">
+        <a class="mod-logo" href="index.html">Cognee</a>
+        <span class="mod-title-badge">🛡 МОДЕРАЦИЯ</span>
+        <span class="mod-user" id="mod-user-email"></span>
+        <button class="mod-logout-btn" onclick="doLogout()">Выйти</button>
+    </header>
+
+    <!-- MAIN LAYOUT -->
+    <div class="mod-layout" id="mod-layout">
+        <div class="mod-spinner" id="mod-spinner"></div>
+    </div>
+
+    <script src="config.js" onerror="console.warn('[Cognee] config.js не найден')"></script>
+    <script src="supabase.js"></script>
+    <script>
+    // moderation.js inline — v8.5
+    (function(){
+    'use strict';
+
+    const REASON_LABELS = {
+        spam:            'Спам',
+        misinformation:  'Дезинформация',
+        offensive:       'Оскорбления',
+        plagiarism:      'Плагиат',
+        other:           'Другое',
+    };
+
+    const STATUS_LABELS = {
+        pending:   'Ожидает',
+        reviewed:  'Просмотрено',
+        resolved:  'Решено',
+        dismissed: 'Отклонено',
+    };
+
+    let allReports   = [];
+    let activeFilter = 'all';
+
+    // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            await CogneeSupabase.init();
+
+            if (!CogneeSupabase.isAuthenticated()) {
+                showAccessDenied('Войдите в аккаунт модератора');
+                return;
+            }
+
+            const user = CogneeSupabase.getCurrentUser();
+            document.getElementById('mod-user-email').textContent = user.email || '';
+
+            // Проверяем статус модератора
+            const modCheck = await CogneeSupabase._dbFetch('GET',
+                '/rest/v1/moderators?user_id=eq.' + user.id + '&is_active=eq.true&select=user_id');
+
+            if (!Array.isArray(modCheck) || modCheck.length === 0) {
+                showAccessDenied('У вас нет прав модератора');
+                return;
+            }
+
+            await loadReports();
+
+        } catch(e) {
+            console.error('[Cognee moderation v8.5]', e);
+            showAccessDenied('Ошибка инициализации: ' + e.message);
+        }
+    });
+
+    // ── ЗАГРУЗКА ЖАЛОБ ────────────────────────────────────────────────────────
+    async function loadReports() {
+        showSpinner(true);
+        try {
+            const res = await CogneeSupabase._rpc('get_pending_reports', { p_limit: 100, p_offset: 0 });
+            allReports = Array.isArray(res) ? res : [];
+            renderAll();
+        } catch(e) {
+            console.error('[Cognee moderation v8.5] loadReports:', e);
+            showToast('Ошибка загрузки жалоб: ' + e.message, 'err');
+        } finally {
+            showSpinner(false);
+        }
+    }
+
+    // ── РЕНДЕР ────────────────────────────────────────────────────────────────
+    function renderAll() {
+        const layout = document.getElementById('mod-layout');
+
+        // Считаем статистику
+        const counts = { all: allReports.length, pending: 0, reviewed: 0, resolved: 0, dismissed: 0 };
+        allReports.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+
+        // Фильтруем
+        const filtered = activeFilter === 'all'
+            ? allReports
+            : allReports.filter(r => r.status === activeFilter);
+
+        layout.innerHTML = `
+            <!-- Статистика -->
+            <div class="stats-row">
+                <div class="stat-card pending">
+                    <div class="stat-card-val">${counts.pending}</div>
+                    <div class="stat-card-lbl">Ожидают</div>
+                </div>
+                <div class="stat-card reviewed">
+                    <div class="stat-card-val">${counts.reviewed}</div>
+                    <div class="stat-card-lbl">Просмотрено</div>
+                </div>
+                <div class="stat-card resolved">
+                    <div class="stat-card-val">${counts.resolved}</div>
+                    <div class="stat-card-lbl">Решено</div>
+                </div>
+                <div class="stat-card dismissed">
+                    <div class="stat-card-val">${counts.dismissed}</div>
+                    <div class="stat-card-lbl">Отклонено</div>
+                </div>
+            </div>
+
+            <!-- Фильтры -->
+            <div class="filter-row">
+                <button class="filter-btn ${activeFilter==='all'?'active':''}" onclick="setFilter('all')">
+                    Все (${counts.all})
+                </button>
+                <button class="filter-btn ${activeFilter==='pending'?'active':''}" onclick="setFilter('pending')">
+                    ⏳ Ожидают (${counts.pending})
+                </button>
+                <button class="filter-btn ${activeFilter==='reviewed'?'active':''}" onclick="setFilter('reviewed')">
+                    👁 Просмотрено (${counts.reviewed})
+                </button>
+                <button class="filter-btn ${activeFilter==='resolved'?'active':''}" onclick="setFilter('resolved')">
+                    ✅ Решено (${counts.resolved})
+                </button>
+                <button class="filter-btn ${activeFilter==='dismissed'?'active':''}" onclick="setFilter('dismissed')">
+                    ✗ Отклонено (${counts.dismissed})
+                </button>
+                <button class="reload-btn" onclick="loadReports()">↺ Обновить</button>
+            </div>
+
+            <!-- Карточки -->
+            <div class="reports-list" id="reports-list">
+                ${filtered.length === 0
+                    ? '<div class="empty-state"><span class="empty-state-icon">✅</span>Жалоб в этой категории нет</div>'
+                    : filtered.map(r => renderCard(r)).join('')
+                }
+            </div>
+        `;
+    }
+
+    function renderCard(r) {
+        const isPending   = r.status === 'pending';
+        const reasonLabel = REASON_LABELS[r.reason] || r.reason;
+        const statusLabel = STATUS_LABELS[r.status]  || r.status;
+        const date        = r.created_at
+            ? new Date(r.created_at).toLocaleString('ru-RU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+            : '';
+        const articleUrl  = 'reader.html?id=' + r.article_id;
+        const articleTitle = escHtml(r.article_title || 'Статья #' + r.article_id);
+        const reporter     = escHtml(r.reporter_name  || 'Аноним');
+        const comment      = r.comment ? '<div class="report-comment-text">' + escHtml(r.comment) + '</div>' : '';
+
+        const btns = isPending ? `
+            <button class="act-btn reviewed"  onclick="resolveReport(${r.id},'reviewed',false)">👁 Просмотрено</button>
+            <button class="act-btn resolved"   onclick="resolveReport(${r.id},'resolved',false)">✅ Решить</button>
+            <button class="act-btn resolved-hide" onclick="resolveReport(${r.id},'resolved',true)">🚫 Решить + скрыть статью</button>
+            <button class="act-btn dismissed"  onclick="resolveReport(${r.id},'dismissed',false)">✗ Отклонить</button>
+        ` : `<span style="font-size:12px;color:var(--muted,#5a7090);font-family:'JetBrains Mono',monospace">Обработано</span>`;
+
+        return `
+            <div class="report-card" id="report-card-${r.id}">
+                <div class="report-card-head">
+                    <span class="reason-badge reason-${r.reason}">${reasonLabel}</span>
+                    <a class="report-article-link" href="${articleUrl}" target="_blank">${articleTitle}</a>
+                    <span class="report-status-badge status-${r.status}">${statusLabel}</span>
+                </div>
+                <div class="report-meta">
+                    <span>👤 ${reporter}</span>
+                    <span>📅 ${date}</span>
+                    <span>🆔 жалоба #${r.id}</span>
+                </div>
+                ${comment}
+                <div class="report-actions">${btns}</div>
+            </div>
+        `;
+    }
+
+    // ── ФИЛЬТР ────────────────────────────────────────────────────────────────
+    window.setFilter = function(filter) {
+        activeFilter = filter;
+        renderAll();
+    };
+
+    // ── МОДЕРАТОРСКИЕ ДЕЙСТВИЯ ────────────────────────────────────────────────
+    window.resolveReport = async function(reportId, status, hideArticle) {
+        const card = document.getElementById('report-card-' + reportId);
+        if (card) {
+            card.querySelectorAll('.act-btn').forEach(b => b.disabled = true);
+        }
+        try {
+            await CogneeSupabase._rpc('resolve_report', {
+                p_report_id:   reportId,
+                p_status:      status,
+                p_hide_article: hideArticle,
+            });
+
+            // Обновляем локально
+            const r = allReports.find(x => x.id === reportId);
+            if (r) r.status = status;
+
+            showToast(
+                status === 'resolved'  ? (hideArticle ? '✅ Решено — статья скрыта' : '✅ Решено') :
+                status === 'reviewed'  ? '👁 Отмечено как просмотренное' :
+                '✗ Жалоба отклонена',
+                status === 'dismissed' ? 'warn' : 'ok'
+            );
+            renderAll();
+        } catch(e) {
+            console.error('[Cognee moderation v8.5] resolveReport:', e);
+            showToast('Ошибка: ' + e.message, 'err');
+            if (card) {
+                card.querySelectorAll('.act-btn').forEach(b => b.disabled = false);
+            }
+        }
+    };
+
+    // ── LOGOUT ────────────────────────────────────────────────────────────────
+    window.doLogout = async function() {
+        try {
+            await CogneeSupabase.signOut();
+        } finally {
+            location.href = 'index.html';
+        }
+    };
+
+    // ── УТИЛИТЫ ───────────────────────────────────────────────────────────────
+    function showAccessDenied(msg) {
+        document.getElementById('mod-layout').innerHTML = `
+            <div class="access-denied">
+                <span class="access-denied-icon">🔒</span>
+                <div class="access-denied-title">Доступ запрещён</div>
+                <div class="access-denied-sub">${escHtml(msg)}</div>
+                <a href="index.html" style="color:#4FC3F7;font-size:14px;">← На главную</a>
+            </div>
+        `;
+    }
+
+    function showSpinner(show) {
+        let sp = document.getElementById('mod-spinner');
+        if (show) {
+            if (!sp) {
+                sp = document.createElement('div');
+                sp.id = 'mod-spinner';
+                sp.className = 'mod-spinner';
+                document.getElementById('mod-layout').appendChild(sp);
+            }
+            sp.style.display = 'block';
+        } else {
+            if (sp) sp.style.display = 'none';
+        }
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    window.showToast = function(msg, type) {
+        type = type || 'ok';
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className   = 'toast ' + type;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 300);
+        }, 3500);
+    };
+
+    })();
+    </script>
+</body>
+</html>

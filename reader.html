@@ -1,8 +1,7 @@
-<!-- reader.html — v8.4 | Глобальная версия: 8.4 -->
-<!-- Блок 4: Страница чтения статьи. Поддержка slug для приватных статей. -->
-<!-- Заглушка при попытке открыть приватную статью по числовому ID. -->
+<!-- reader.html — v8.5 | Глобальная версия: 8.5 -->
+<!-- Изменения v8.5: добавлены кнопки "Избранное" и "Пожаловаться", их логика, toast-уведомления -->
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,6 +22,7 @@
     <style>
         :root { --reader-max: 720px; }
 
+        /* ── NAV ── */
         .reader-nav {
             position: sticky; top: 0; z-index: 100;
             background: rgba(15,15,15,0.92); backdrop-filter: blur(10px);
@@ -46,11 +46,13 @@
         }
         .reader-nav-link:hover { color: #4FC3F7; }
 
+        /* ── PROGRESS ── */
         .read-progress {
             position: fixed; top: 52px; left: 0; height: 2px; width: 0%;
             background: linear-gradient(90deg, #4FC3F7, #7C4DFF); z-index: 101; transition: width 0.1s;
         }
 
+        /* ── META ── */
         .article-meta {
             max-width: var(--reader-max); margin: 40px auto 0; padding: 0 24px;
         }
@@ -76,88 +78,153 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted, #5a7090); letter-spacing: 0.04em;
         }
+        .vis-badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            background: rgba(79,195,247,0.12); color: #4FC3F7;
+            border: 1px solid rgba(79,195,247,0.3); border-radius: 4px;
+            padding: 2px 8px; letter-spacing: 0.06em;
+        }
 
-        /* СОСТОЯНИЯ */
+        /* ── ARTICLE CONTENT ── */
+        .article { max-width: var(--reader-max); margin: 32px auto; padding: 0 24px; }
+        .article-content-inner { font-family: 'Lora', serif; font-size: 18px; line-height: 1.8; }
+        .article-content-inner p  { margin-bottom: 1.4em; }
+        .article-content-inner h2 { font-family:'Unbounded',sans-serif; font-size:1.3em; font-weight:700; margin:2em 0 0.7em; letter-spacing:-0.02em; }
+        .article-content-inner h3 { font-family:'Unbounded',sans-serif; font-size:1.1em; font-weight:700; margin:1.6em 0 0.5em; }
+        .article-content-inner blockquote { border-left:3px solid #4FC3F7; padding-left:1em; color:var(--muted,#5a7090); font-style:italic; margin:1.5em 0; }
+        .article-content-inner hr { border:none; border-top:1px solid rgba(79,195,247,0.15); margin:2em 0; }
+        .article-content-inner ul,.article-content-inner ol { padding-left:1.5em; margin-bottom:1.4em; }
+        .article-content-inner li { margin-bottom:0.4em; }
+        .article-content-inner strong { font-weight:700; }
+        .article-content-inner em { font-style:italic; }
+
+        /* ── STATES ── */
         .loading-state, .error-state, .private-state {
             max-width: var(--reader-max); margin: 80px auto; padding: 0 24px; text-align: center;
         }
         .loading-spinner {
-            width: 32px; height: 32px;
-            border: 3px solid rgba(79,195,247,0.2); border-top-color: #4FC3F7;
-            border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 20px;
+            width: 36px; height: 36px; border: 3px solid rgba(79,195,247,0.2);
+            border-top-color: #4FC3F7; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 16px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Скрываем вертикальный прогрессбар adapter.js — в читалке есть свой горизонтальный */
-        #cognee-progress-bar { display: none !important; }
-        .loading-text {
-            font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted, #5a7090);
-        }
-        .error-icon, .private-icon { font-size: 48px; margin-bottom: 20px; display: block; }
-        .error-title, .private-title {
-            font-family: 'Unbounded', sans-serif; font-size: 20px; font-weight: 700;
-            color: #e0dbd0; margin-bottom: 10px;
-        }
-        .error-sub, .private-sub {
-            font-size: 14px; color: var(--muted, #5a7090); margin-bottom: 24px; line-height: 1.6;
-        }
-        /* Заглушка приватной статьи */
-        .private-state {
-            background: rgba(124,77,255,0.04);
-            border: 1px solid rgba(124,77,255,0.15);
-            border-radius: 16px; padding: 60px 40px; margin-top: 60px;
-        }
-        .private-icon { filter: grayscale(0.3); }
-        .private-hint {
-            font-family: 'JetBrains Mono', monospace; font-size: 12px;
-            color: #b39ddb; background: rgba(124,77,255,0.08);
-            border: 1px solid rgba(124,77,255,0.2); border-radius: 8px;
-            padding: 12px 18px; margin: 0 auto 24px; max-width: 440px;
-            line-height: 1.6; text-align: left;
-        }
-
+        .loading-text   { font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted,#5a7090); }
+        .error-icon, .private-icon { font-size: 48px; display: block; margin-bottom: 16px; }
+        .error-title, .private-title { font-family:'Unbounded',sans-serif; font-size:20px; font-weight:700; margin-bottom:8px; }
+        .error-sub, .private-sub    { font-size:14px; color:var(--muted,#5a7090); margin-bottom:24px; }
+        .private-hint { font-size:13px; color:var(--muted,#5a7090); background:rgba(79,195,247,0.06); border:1px solid rgba(79,195,247,0.15); border-radius:8px; padding:16px; margin-bottom:24px; line-height:1.6; }
         .btn-back, .btn-catalog {
-            font-family: 'JetBrains Mono', monospace; font-size: 13px;
-            background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.25);
-            border-radius: 8px; padding: 10px 20px; color: #4FC3F7;
-            text-decoration: none; display: inline-block; margin: 4px;
+            display: inline-block; margin: 4px 8px;
+            padding: 10px 20px; border-radius: 8px; font-size: 13px;
+            text-decoration: none; transition: background 0.2s;
         }
-        .btn-catalog {
-            background: rgba(124,77,255,0.1); border-color: rgba(124,77,255,0.3); color: #b39ddb;
+        .btn-back    { background: rgba(79,195,247,0.1); color:#4FC3F7; border:1px solid rgba(79,195,247,0.3); }
+        .btn-catalog { background: rgba(124,77,255,0.1); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
+        .btn-back:hover    { background: rgba(79,195,247,0.2); }
+        .btn-catalog:hover { background: rgba(124,77,255,0.2); }
+
+        /* ── ACTION BAR (избранное + поделиться + пожаловаться) ── */
+        .action-bar {
+            max-width: var(--reader-max); margin: 32px auto 0; padding: 0 24px;
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .action-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px; border-radius: 8px; font-size: 13px;
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em;
+            border: 1px solid; cursor: pointer; transition: all 0.2s; background: none;
+        }
+        /* Избранное */
+        .action-btn.fav {
+            color: #FFB300; border-color: rgba(255,179,0,0.3);
+            background: rgba(255,179,0,0.06);
+        }
+        .action-btn.fav:hover    { background: rgba(255,179,0,0.14); }
+        .action-btn.fav.active   { background: rgba(255,179,0,0.18); border-color:rgba(255,179,0,0.6); }
+        .action-btn.fav.loading  { opacity: 0.5; pointer-events: none; }
+
+        /* Поделиться */
+        .action-btn.share  { color:#4FC3F7; border-color:rgba(79,195,247,0.3); background:rgba(79,195,247,0.06); }
+        .action-btn.share:hover  { background:rgba(79,195,247,0.14); }
+        .action-btn.share-tg { color:#29B6F6; border-color:rgba(41,182,246,0.3); background:rgba(41,182,246,0.06); }
+        .action-btn.share-tg:hover { background:rgba(41,182,246,0.14); }
+
+        /* Пожаловаться */
+        .action-btn.report { color:#FF5252; border-color:rgba(255,82,82,0.3); background:rgba(255,82,82,0.06); margin-left: auto; }
+        .action-btn.report:hover  { background:rgba(255,82,82,0.14); }
+        .action-btn.report:disabled { opacity:0.4; cursor:not-allowed; pointer-events:none; }
+
+        .fav-count {
+            font-size:11px; color:var(--muted,#5a7090);
+            font-family:'JetBrains Mono',monospace; margin-left:2px;
         }
 
-        /* ПОДЕЛИТЬСЯ */
-        .share-bar {
-            max-width: var(--reader-max); margin: 40px auto 0; padding: 24px;
-            border-top: 1px solid rgba(79,195,247,0.1);
-            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        /* ── МОДАЛЬНОЕ ОКНО ЖАЛОБЫ ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 500;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+            align-items: center; justify-content: center;
         }
-        .share-lbl {
-            font-family: 'JetBrains Mono', monospace; font-size: 11px;
-            text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted, #5a7090);
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: #141820; border: 1px solid rgba(79,195,247,0.15);
+            border-radius: 16px; padding: 28px; width: min(480px, calc(100vw - 32px));
+            box-shadow: 0 24px 48px rgba(0,0,0,0.5);
         }
-        .share-btn {
-            font-family: 'JetBrains Mono', monospace; font-size: 12px;
-            background: rgba(79,195,247,0.07); border: 1px solid rgba(79,195,247,0.18);
-            border-radius: 6px; padding: 5px 14px; color: #4FC3F7; cursor: pointer; transition: all 0.2s;
+        [data-theme="light"] .modal-box { background: #fff; border-color:rgba(0,0,0,0.1); }
+        .modal-title {
+            font-family:'Unbounded',sans-serif; font-size:16px; font-weight:700;
+            margin-bottom:6px; color:#FF5252;
         }
-        .share-btn:hover { background: rgba(79,195,247,0.15); }
-        .share-btn.copied { color: #66BB6A; border-color: #66BB6A; }
+        .modal-sub { font-size:13px; color:var(--muted,#5a7090); margin-bottom:20px; }
+        .report-options { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+        .report-option {
+            display:flex; align-items:center; gap:10px;
+            padding:10px 14px; border-radius:8px; cursor:pointer;
+            border:1px solid rgba(255,82,82,0.2); background:rgba(255,82,82,0.04);
+            transition: background 0.15s, border-color 0.15s;
+            font-size:13px;
+        }
+        .report-option input[type=radio] { accent-color:#FF5252; flex-shrink:0; }
+        .report-option:hover    { background:rgba(255,82,82,0.1); border-color:rgba(255,82,82,0.4); }
+        .report-option.selected { background:rgba(255,82,82,0.14); border-color:rgba(255,82,82,0.6); }
+        .report-comment {
+            width:100%; box-sizing:border-box; padding:10px 14px;
+            background:rgba(255,255,255,0.04); border:1px solid rgba(79,195,247,0.15);
+            border-radius:8px; color:inherit; font-size:13px; resize:vertical; min-height:72px;
+            font-family:inherit; margin-bottom:16px;
+            transition: border-color 0.2s;
+        }
+        [data-theme="light"] .report-comment { background:rgba(0,0,0,0.04); }
+        .report-comment:focus { outline:none; border-color:rgba(255,82,82,0.5); }
+        .modal-btns { display:flex; gap:10px; justify-content:flex-end; }
+        .modal-btn {
+            padding:9px 20px; border-radius:8px; font-size:13px;
+            font-family:'JetBrains Mono',monospace; cursor:pointer;
+            border:1px solid; transition:all 0.2s;
+        }
+        .modal-btn.cancel  { background:none; color:var(--muted,#5a7090); border-color:rgba(255,255,255,0.1); }
+        .modal-btn.cancel:hover { background:rgba(255,255,255,0.06); }
+        .modal-btn.submit  { background:rgba(255,82,82,0.12); color:#FF5252; border-color:rgba(255,82,82,0.4); }
+        .modal-btn.submit:hover  { background:rgba(255,82,82,0.22); }
+        .modal-btn.submit:disabled { opacity:0.4; cursor:not-allowed; }
 
-        /* Бейдж приватности в метаданных */
-        .vis-badge {
-            font-family: 'JetBrains Mono', monospace; font-size: 10px;
-            letter-spacing: 0.06em; text-transform: uppercase;
-            border-radius: 4px; padding: 2px 8px;
+        /* ── TOAST ── */
+        #toast-container {
+            position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+            z-index:600; display:flex; flex-direction:column; align-items:center; gap:8px;
+            pointer-events:none;
         }
-        .vis-badge.public  { background: rgba(79,195,247,0.1);  color: #4FC3F7; }
-        .vis-badge.private { background: rgba(124,77,255,0.12); color: #b39ddb; }
-
-        @media (max-width: 600px) {
-            .article-meta, .share-bar { padding: 0 16px; }
-            .reader-nav { padding: 0 16px; }
-            .private-state { padding: 40px 20px; }
+        .toast {
+            padding:10px 20px; border-radius:10px; font-size:13px;
+            font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;
+            pointer-events:none; animation:toastIn 0.25s ease;
+            border:1px solid; backdrop-filter:blur(8px);
         }
+        .toast.ok  { background:rgba(79,195,247,0.14); color:#4FC3F7; border-color:rgba(79,195,247,0.3); }
+        .toast.err { background:rgba(255,82,82,0.14); color:#FF5252; border-color:rgba(255,82,82,0.3); }
+        .toast.warn { background:rgba(255,179,0,0.14); color:#FFB300; border-color:rgba(255,179,0,0.3); }
+        @keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
     </style>
 </head>
 <body data-theme="dark">
@@ -181,7 +248,7 @@
         <div class="loading-text">Загружаем статью...</div>
     </div>
 
-    <!-- ERROR: статья не найдена -->
+    <!-- ERROR -->
     <div class="error-state" id="error-state" style="display:none">
         <span class="error-icon">📭</span>
         <div class="error-title">Статья не найдена</div>
@@ -190,7 +257,7 @@
         <a class="btn-catalog" href="catalog.html">📚 Каталог статей</a>
     </div>
 
-    <!-- PRIVATE: попытка открыть приватную статью по числовому ID -->
+    <!-- PRIVATE -->
     <div class="private-state" id="private-state" style="display:none">
         <span class="private-icon">🔒</span>
         <div class="private-title">Статья закрыта</div>
@@ -218,15 +285,70 @@
 
     <!-- КОНТЕНТ -->
     <div class="article" id="article-content" style="display:none">
-        <main id="article-main"></main>
+        <main id="article-main" class="article-content-inner"></main>
     </div>
 
-    <!-- ПОДЕЛИТЬСЯ -->
-    <div class="share-bar" id="share-bar" style="display:none">
-        <span class="share-lbl">Поделиться:</span>
-        <button class="share-btn" id="btn-copy-link" onclick="copyArticleLink()">🔗 Скопировать ссылку</button>
-        <button class="share-btn" onclick="shareToTelegram()">✈ Telegram</button>
+    <!-- ACTION BAR: избранное + поделиться + пожаловаться -->
+    <div class="action-bar" id="action-bar" style="display:none">
+        <!-- Избранное -->
+        <button class="action-btn fav" id="btn-favorite" onclick="toggleFavorite()">
+            <span id="fav-icon">☆</span>
+            <span id="fav-label">В избранное</span>
+            <span class="fav-count" id="fav-count"></span>
+        </button>
+
+        <!-- Поделиться -->
+        <button class="action-btn share" id="btn-copy-link" onclick="copyArticleLink()">
+            🔗 Скопировать ссылку
+        </button>
+        <button class="action-btn share-tg" onclick="shareToTelegram()">
+            ✈ Telegram
+        </button>
+
+        <!-- Пожаловаться (правая сторона) -->
+        <button class="action-btn report" id="btn-report" onclick="openReportModal()">
+            🚩 Пожаловаться
+        </button>
     </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ЖАЛОБЫ -->
+    <div class="modal-overlay" id="report-modal" onclick="handleModalOverlayClick(event)">
+        <div class="modal-box">
+            <div class="modal-title">🚩 Пожаловаться на статью</div>
+            <div class="modal-sub">Выбери причину — мы рассмотрим жалобу в течение 24 часов</div>
+
+            <div class="report-options" id="report-options">
+                <label class="report-option" onclick="selectReason(this,'spam')">
+                    <input type="radio" name="report-reason" value="spam"> Спам или реклама
+                </label>
+                <label class="report-option" onclick="selectReason(this,'misinformation')">
+                    <input type="radio" name="report-reason" value="misinformation"> Недостоверная информация
+                </label>
+                <label class="report-option" onclick="selectReason(this,'offensive')">
+                    <input type="radio" name="report-reason" value="offensive"> Оскорбительный контент
+                </label>
+                <label class="report-option" onclick="selectReason(this,'plagiarism')">
+                    <input type="radio" name="report-reason" value="plagiarism"> Плагиат
+                </label>
+                <label class="report-option" onclick="selectReason(this,'other')">
+                    <input type="radio" name="report-reason" value="other"> Другое
+                </label>
+            </div>
+
+            <textarea class="report-comment" id="report-comment"
+                placeholder="Дополнительный комментарий (необязательно)..." maxlength="500"></textarea>
+
+            <div class="modal-btns">
+                <button class="modal-btn cancel" onclick="closeReportModal()">Отмена</button>
+                <button class="modal-btn submit" id="btn-submit-report" onclick="submitReport()" disabled>
+                    Отправить жалобу
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast контейнер -->
+    <div id="toast-container"></div>
 
     <script src="config.js" onerror="console.warn('[Cognee] config.js не найден')"></script>
     <script src="storage.js"></script>
@@ -236,12 +358,16 @@
     <script src="adapter.js"></script>
 
     <script>
-    // reader.js inline — v8.4
+    // reader.js inline — v8.5
     (function(){
     'use strict';
 
     let currentArticle = null;
+    let currentArticleId = null;
+    let _isFavorited = false;
+    let _selectedReason = null;
 
+    // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────────────────
     window.addEventListener('DOMContentLoaded', async () => {
         const params = new URLSearchParams(location.search);
         const id     = params.get('id');
@@ -249,155 +375,296 @@
         if (!id) { showError(); return; }
 
         try {
-            const article = await loadArticle(id);
-            if (!article) { showError(); return; }
+            await CogneeSupabase.init();
+            const article = await CogneeSupabase.getArticleById(id);
 
-            // Статья найдена, но приватная — показываем заглушку
-            if (article._private) { showPrivate(); return; }
+            if (!article)           { showError();   return; }
+            if (article._private)   { showPrivate(); return; }
 
-            currentArticle = article;
+            currentArticle   = article;
+            currentArticleId = article.id;
             renderArticle(article);
-            setupReadProgress();
+
+            // Загружаем состояние избранного и счётчик параллельно
+            await Promise.all([
+                loadFavoriteState(article.id),
+                loadFavoritesCount(article.id),
+            ]);
+
+            // Показываем action bar только если статья загружена
+            document.getElementById('action-bar').style.display = 'flex';
+
+            // Блокируем кнопку жалобы если не авторизован
+            if (!CogneeSupabase.isAuthenticated()) {
+                const btn = document.getElementById('btn-report');
+                btn.title = 'Войдите, чтобы пожаловаться';
+                btn.disabled = true;
+            }
+
         } catch(e) {
-            console.error('[Reader] Ошибка загрузки:', e);
+            console.error('[Cognee reader v8.5]', e);
             showError();
         }
     });
 
-    async function loadArticle(id) {
-        if (window.CogneeSupabase) {
-            try {
-                await window.CogneeSupabase.init();
-                const article = await window.CogneeSupabase.getArticleById(id);
-                if (article) return article;
-            } catch(e) {
-                console.warn('[Reader] Supabase недоступен, пробуем локально:', e.message);
-            }
-        }
-
-        // Fallback: localStorage (черновики)
-        try {
-            const all = JSON.parse(localStorage.getItem('cognee_articles') || '{}');
-            if (all[id]) return all[id];
-        } catch(e) {}
-
-        return null;
-    }
-
+    // ── РЕНДЕР СТАТЬИ ─────────────────────────────────────────────────────────
     function renderArticle(article) {
-        document.getElementById('loading-state').style.display = 'none';
-
-        document.title = `${article.title} — Cognee`;
+        document.title = article.title + ' — Cognee';
         document.getElementById('nav-title').textContent = article.title;
+
+        // Мета
         document.getElementById('meta-title').textContent = article.title;
+        document.getElementById('meta-author').textContent = '✍ ' + (article.author_name || 'Автор');
+        document.getElementById('meta-date').textContent   = formatDate(article.published_at);
+
+        const words    = (article.content || '').trim().split(/\s+/).length;
+        const readMins = Math.max(1, Math.round(words / 200));
+        document.getElementById('meta-read').textContent = '⏱ ' + readMins + ' мин';
 
         if (article.annotation) {
-            const annEl = document.getElementById('meta-annotation');
-            annEl.textContent = article.annotation;
-            annEl.style.display = 'block';
+            const ann = document.getElementById('meta-annotation');
+            ann.textContent    = article.annotation;
+            ann.style.display  = 'block';
         }
 
-        document.getElementById('meta-author').textContent =
-            '👤 ' + (article.author_name || 'Автор');
-
-        if (article.published_at) {
-            const d = new Date(article.published_at);
-            document.getElementById('meta-date').textContent =
-                '📅 ' + d.toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
-        }
-
-        const words = (article.content || '').trim().split(/\s+/).length;
-        document.getElementById('meta-read').textContent =
-            `⏱ ${Math.max(1, Math.round(words / 200))} мин чтения`;
-
-        // Бейдж приватности — показываем только автору (если он авторизован)
         if (article.visibility === 'private') {
             const badge = document.getElementById('meta-vis-badge');
-            badge.textContent = '🔒 Приватная';
-            badge.className = 'vis-badge private';
+            badge.textContent  = '🔒 приватная';
             badge.style.display = 'inline-block';
         }
 
         document.getElementById('article-meta').style.display = 'block';
 
-        const main = document.getElementById('article-main');
-        const simplifiedMap = buildSimplifiedMap(article.content_simple);
-        const paragraphs = (article.content || '').split(/\n\s*\n/).filter(p => p.trim());
-
-        paragraphs.forEach(para => {
-            const el = renderParagraph(para.trim(), simplifiedMap);
-            if (el) main.appendChild(el);
-        });
-
+        // Контент
+        document.getElementById('article-main').innerHTML = renderMarkdown(article.content || '');
         document.getElementById('article-content').style.display = 'block';
-        document.getElementById('share-bar').style.display = 'flex';
 
-        if (window.CogneeAdapter) window.CogneeAdapter.init();
+        document.getElementById('loading-state').style.display = 'none';
+        setupReadProgress();
     }
 
-    function buildSimplifiedMap(contentSimpleJson) {
-        const map = {};
-        if (!contentSimpleJson) return map;
+    // ── ИЗБРАННОЕ ─────────────────────────────────────────────────────────────
+    async function loadFavoriteState(articleId) {
+        if (!CogneeSupabase.isAuthenticated()) return;
         try {
-            const arr = JSON.parse(contentSimpleJson);
-            if (Array.isArray(arr)) {
-                arr.forEach(item => {
-                    if (item.original && item.simplified && item.original !== item.simplified) {
-                        map[item.original.trim()] = item.simplified;
-                    }
-                });
+            const res = await CogneeSupabase._dbFetch('GET',
+                '/rest/v1/favorites?article_id=eq.' + articleId +
+                '&user_id=eq.' + CogneeSupabase.getCurrentUser().id +
+                '&select=id');
+            _isFavorited = Array.isArray(res) && res.length > 0;
+            updateFavBtn(_isFavorited);
+        } catch(e) {}
+    }
+
+    async function loadFavoritesCount(articleId) {
+        try {
+            const res = await CogneeSupabase._rpc('get_favorites_count', { p_article_id: articleId });
+            const count = (res && res[0] && res[0].get_favorites_count) ? res[0].get_favorites_count : null;
+            if (count !== null && count > 0) {
+                document.getElementById('fav-count').textContent = count;
             }
         } catch(e) {}
-        return map;
     }
 
-    function renderParagraph(text, simplifiedMap) {
-        if (text.startsWith('## ')) {
-            const h = document.createElement('h2'); h.textContent = text.slice(3); return h;
+    window.toggleFavorite = async function() {
+        if (!CogneeSupabase.isAuthenticated()) {
+            showToast('Войдите в аккаунт, чтобы добавить в избранное', 'warn');
+            setTimeout(() => { location.href = 'auth.html?redirect=' + encodeURIComponent(location.href); }, 1200);
+            return;
         }
-        if (text.startsWith('### ')) {
-            const h = document.createElement('h3'); h.textContent = text.slice(4); return h;
-        }
-        if (text.startsWith('# ')) {
-            const h = document.createElement('h2'); h.textContent = text.slice(2); return h;
-        }
-        if (text === '---') return document.createElement('hr');
-        if (text.startsWith('> ')) {
-            const bq = document.createElement('blockquote'); bq.textContent = text.slice(2); return bq;
-        }
-        if (text.startsWith('- ')) {
-            const ul = document.createElement('ul');
-            text.split('\n').forEach(line => {
-                if (line.startsWith('- ')) {
-                    const li = document.createElement('li'); li.textContent = line.slice(2); ul.appendChild(li);
-                }
-            });
-            return ul;
-        }
+        const btn = document.getElementById('btn-favorite');
+        btn.classList.add('loading');
+        try {
+            const userId    = CogneeSupabase.getCurrentUser().id;
+            const articleId = currentArticleId;
 
-        const wrap = document.createElement('div');
-        wrap.className = 'para-block';
-
-        const full = document.createElement('p');
-        full.className = 'para-full';
-        full.innerHTML = markupInline(text);
-        wrap.appendChild(full);
-
-        const simplified = simplifiedMap[text];
-        if (simplified) {
-            const simple = document.createElement('p');
-            simple.className = 'para-simple';
-            simple.style.display = 'none';
-            simple.textContent = simplified;
-            wrap.appendChild(simple);
+            if (_isFavorited) {
+                // Удаляем из избранного
+                await CogneeSupabase._dbFetch('DELETE',
+                    '/rest/v1/favorites?article_id=eq.' + articleId +
+                    '&user_id=eq.' + userId);
+                _isFavorited = false;
+                updateFavBtn(false);
+                bumpFavCount(-1);
+                showToast('Убрано из избранного', 'ok');
+            } else {
+                // Добавляем в избранное
+                await CogneeSupabase._dbFetch('POST', '/rest/v1/favorites',
+                    [{ user_id: userId, article_id: articleId }]);
+                _isFavorited = true;
+                updateFavBtn(true);
+                bumpFavCount(+1);
+                showToast('★ Добавлено в избранное!', 'ok');
+            }
+        } catch(e) {
+            console.error('[Cognee reader v8.5] toggleFavorite:', e);
+            showToast('Ошибка. Попробуйте снова', 'err');
+        } finally {
+            btn.classList.remove('loading');
         }
+    };
 
-        return wrap;
+    function updateFavBtn(active) {
+        const btn   = document.getElementById('btn-favorite');
+        const icon  = document.getElementById('fav-icon');
+        const label = document.getElementById('fav-label');
+        if (active) {
+            btn.classList.add('active');
+            icon.textContent  = '★';
+            label.textContent = 'В избранном';
+        } else {
+            btn.classList.remove('active');
+            icon.textContent  = '☆';
+            label.textContent = 'В избранное';
+        }
     }
 
-    function markupInline(text) {
+    function bumpFavCount(delta) {
+        const el  = document.getElementById('fav-count');
+        const cur = parseInt(el.textContent || '0', 10);
+        const nxt = Math.max(0, cur + delta);
+        el.textContent = nxt > 0 ? nxt : '';
+    }
+
+    // ── ЖАЛОБА ────────────────────────────────────────────────────────────────
+    window.openReportModal = function() {
+        if (!CogneeSupabase.isAuthenticated()) {
+            showToast('Войдите в аккаунт, чтобы пожаловаться', 'warn');
+            return;
+        }
+        _selectedReason = null;
+        document.querySelectorAll('.report-option').forEach(o => o.classList.remove('selected'));
+        document.getElementById('report-comment').value = '';
+        document.getElementById('btn-submit-report').disabled = true;
+        document.getElementById('report-modal').classList.add('open');
+    };
+
+    window.closeReportModal = function() {
+        document.getElementById('report-modal').classList.remove('open');
+    };
+
+    window.handleModalOverlayClick = function(e) {
+        if (e.target === document.getElementById('report-modal')) closeReportModal();
+    };
+
+    window.selectReason = function(el, reason) {
+        _selectedReason = reason;
+        document.querySelectorAll('.report-option').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('btn-submit-report').disabled = false;
+    };
+
+    window.submitReport = async function() {
+        if (!_selectedReason) return;
+
+        const submitBtn = document.getElementById('btn-submit-report');
+        submitBtn.disabled    = true;
+        submitBtn.textContent = 'Отправляем...';
+
+        try {
+            const userId  = CogneeSupabase.getCurrentUser().id;
+            const comment = document.getElementById('report-comment').value.trim() || null;
+
+            await CogneeSupabase._dbFetch('POST', '/rest/v1/reports', [{
+                article_id:  currentArticleId,
+                reporter_id: userId,
+                reason:      _selectedReason,
+                comment:     comment,
+                status:      'pending',
+            }]);
+
+            closeReportModal();
+            showToast('Жалоба отправлена. Спасибо!', 'ok');
+
+            // Блокируем кнопку — нельзя жаловаться дважды
+            const reportBtn = document.getElementById('btn-report');
+            reportBtn.disabled    = true;
+            reportBtn.textContent = '✓ Жалоба отправлена';
+
+        } catch(e) {
+            console.error('[Cognee reader v8.5] submitReport:', e);
+            // Обрабатываем duplicate (unique constraint)
+            const msg = String(e?.message || '');
+            if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('23505')) {
+                closeReportModal();
+                showToast('Вы уже жаловались на эту статью', 'warn');
+                document.getElementById('btn-report').disabled    = true;
+                document.getElementById('btn-report').textContent = '✓ Жалоба уже отправлена';
+            } else {
+                showToast('Ошибка при отправке жалобы', 'err');
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Отправить жалобу';
+            }
+        }
+    };
+
+    // ── ПОДЕЛИТЬСЯ ────────────────────────────────────────────────────────────
+    window.copyArticleLink = function() {
+        navigator.clipboard.writeText(location.href).then(() => {
+            const btn = document.getElementById('btn-copy-link');
+            const orig = btn.textContent;
+            btn.textContent = '✓ Скопировано!';
+            setTimeout(() => { btn.textContent = orig; }, 2500);
+            showToast('Ссылка скопирована', 'ok');
+        }).catch(() => {});
+    };
+
+    window.shareToTelegram = function() {
+        const text = encodeURIComponent((currentArticle?.title || 'Статья') + ' — Cognee');
+        const url  = encodeURIComponent(location.href);
+        window.open('https://t.me/share/url?url=' + url + '&text=' + text, '_blank');
+    };
+
+    // ── TOAST ─────────────────────────────────────────────────────────────────
+    window.showToast = function(msg, type) {
+        type = type || 'ok';
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className   = 'toast ' + type;
+        el.textContent = msg;
+        container.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity    = '0';
+            setTimeout(() => el.remove(), 300);
+        }, 3000);
+    };
+
+    // ── УТИЛИТЫ ───────────────────────────────────────────────────────────────
+    function formatDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        return '📅 ' + d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
+    }
+
+    function renderMarkdown(text) {
         return text
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .split(/\n\s*\n/)
+            .map(block => {
+                const b = block.trim();
+                if (!b) return '';
+                if (/^#{2}\s/.test(b)) return '<h2>' + escHtml(b.replace(/^#{2}\s/,'')) + '</h2>';
+                if (/^#{3}\s/.test(b)) return '<h3>' + escHtml(b.replace(/^#{3}\s/,'')) + '</h3>';
+                if (/^>\s/.test(b))    return '<blockquote>' + escHtml(b.replace(/^>\s/,'')) + '</blockquote>';
+                if (/^---$/.test(b))   return '<hr>';
+                if (/^[*-]\s/.test(b)) {
+                    const items = b.split('\n')
+                        .filter(l => /^[*-]\s/.test(l.trim()))
+                        .map(l => '<li>' + inlineFormat(escHtml(l.replace(/^[*-]\s/,''))) + '</li>')
+                        .join('');
+                    return '<ul>' + items + '</ul>';
+                }
+                return '<p>' + inlineFormat(escHtml(b)) + '</p>';
+            })
+            .join('\n');
+    }
+
+    function escHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function inlineFormat(s) {
+        return s
             .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
             .replace(/_(.+?)_/g,'<em>$1</em>');
     }
@@ -423,24 +690,6 @@
         document.getElementById('nav-title').textContent = 'Приватная статья';
         document.title = 'Закрытая статья — Cognee';
     }
-
-    window.copyArticleLink = function() {
-        navigator.clipboard.writeText(location.href).then(() => {
-            const btn = document.getElementById('btn-copy-link');
-            btn.textContent = '✓ Скопировано!';
-            btn.classList.add('copied');
-            setTimeout(() => {
-                btn.textContent = '🔗 Скопировать ссылку';
-                btn.classList.remove('copied');
-            }, 2500);
-        }).catch(() => {});
-    };
-
-    window.shareToTelegram = function() {
-        const text = encodeURIComponent((currentArticle?.title || 'Статья') + ' — Cognee');
-        const url  = encodeURIComponent(location.href);
-        window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
-    };
 
     })();
     </script>

@@ -1,10 +1,10 @@
-// supabase.js — v8.4.2
-// Файл: supabase.js | Глобальная версия: 8.4
-// Исправления v8.4.2:
-//   • _dbFetch: улучшено логирование ошибок PostgREST для диагностики
-//   • getUserArticlesFull: fallback-запрос без новых полей если миграция не применялась
-//   • getArticleById: убрана лишняя ветка exists-запроса (было BUG 6)
-//   • publishArticle: возвращает { id, slug }
+// supabase.js — v8.5
+// Файл: supabase.js | Глобальная версия: 8.5
+// Изменения v8.5:
+//   • Экспортированы _dbFetch, _rpc, getCurrentUser (нужны для favorites/reports/moderation)
+//   • addFavorite, removeFavorite, isFavorited — удобные хелперы для избранного
+//   • submitReport — хелпер для жалобы
+//   • isModerator — проверка статуса модератора (кеш на сессию)
 // ВАЖНО: подключать ПОСЛЕ storage.js, ДО adapter.js
 
 (function () {
@@ -14,6 +14,8 @@
     let supabaseKey     = null;
     let currentSession  = null;
     let currentUser     = null;
+    let _refreshPromise = null;
+    let _isModeratorCache = null; // null = не проверялось
 
     // ─── ИНИЦИАЛИЗАЦИЯ ───────────────────────────────────────────────────────
     async function init() {
@@ -21,7 +23,7 @@
         supabaseKey = window.COGNEE_SUPABASE_KEY || null;
 
         if (!supabaseUrl || !supabaseKey) {
-            console.warn('[CogneeSupabase] URL или ключ не заданы — работаем офлайн.');
+            console.warn('[CogneeSupabase v8.5] URL или ключ не заданы — работаем офлайн.');
             return false;
         }
 
@@ -34,8 +36,10 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser    = verified;
-                        console.log('[CogneeSupabase v8.4.2] Сессия восстановлена:', currentUser.email);
+                        console.log('[CogneeSupabase v8.5] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
+                        // Запускаем авто-обновление токена через 50 минут
+                        setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                         return true;
                     }
                 }
@@ -44,7 +48,7 @@
             localStorage.removeItem('cognee_session');
         }
 
-        console.log('[CogneeSupabase v8.4.2] Инициализирован. Не авторизован.');
+        console.log('[CogneeSupabase v8.5] Инициализирован. Не авторизован.');
         return false;
     }
 
@@ -60,7 +64,7 @@
             _saveSession(res);
             currentUser = _extractUser(res);
             _dispatchAuthEvent('signed_up', currentUser);
-            _upsertProfile().catch(e => console.warn('[CogneeSupabase] upsert on signup:', e.message));
+            _upsertProfile().catch(e => console.warn('[CogneeSupabase v8.5] upsert on signup:', e.message));
         }
         return res;
     }
@@ -72,9 +76,10 @@
         if (res.error) throw new Error(res.error.message || 'Неверный email или пароль');
         _saveSession(res);
         currentUser = _extractUser(res);
+        _isModeratorCache = null; // сброс кеша при новом входе
         _dispatchAuthEvent('signed_in', currentUser);
         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
-        syncKIMHistory().catch(err => console.warn('[CogneeSupabase] Sync KIM error:', err));
+        syncKIMHistory().catch(err => console.warn('[CogneeSupabase v8.5] Sync KIM error:', err));
         return currentUser;
     }
 
@@ -83,11 +88,13 @@
         if (!currentSession) return;
         try { await _fetch('/auth/v1/logout', 'POST', {}, true); } catch (e) {}
         _clearSession();
+        _isModeratorCache = null;
         _dispatchAuthEvent('signed_out', null);
     }
 
-    function getUser()          { return currentUser; }
-    function isAuthenticated()  { return !!(currentSession && currentUser); }
+    function getUser()         { return currentUser; }
+    function getCurrentUser()  { return currentUser; }  // алиас (удобен в reader/moderation)
+    function isAuthenticated() { return !!(currentSession && currentUser); }
 
     // ─── ПРОФИЛЬ ─────────────────────────────────────────────────────────────
     async function getUserProfile() {
@@ -101,56 +108,129 @@
         if (!isAuthenticated()) throw new Error('Не авторизован');
         const patch = {};
         ['display_name'].forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
-        const res = await _dbFetch('PATCH', '/rest/v1/users?id=eq.' + currentUser.id, patch);
-        if (currentUser) Object.assign(currentUser, patch);
-        return res;
-    }
-
-    // ─── СИНХРОНИЗАЦИЯ КИМ ───────────────────────────────────────────────────
-    async function syncKIMHistory() {
-        if (!isAuthenticated() || !window.CogneeStorage) return;
-        const history = window.CogneeStorage.getHistory();
-        if (!history || history.length === 0) return;
-        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-        const recent = history.filter(r => r.timestamp > cutoff);
-        if (recent.length === 0) return;
-        const BATCH = 50;
-        for (let i = 0; i < recent.length; i += BATCH) {
-            const batch = recent.slice(i, i + BATCH).map(r => ({
-                user_id: currentUser.id, kim: r.kim, zone: r.zone,
-                timestamp: new Date(r.timestamp).toISOString(),
-                features_json: r.features ? JSON.stringify(r.features) : null
-            }));
-            await _dbFetch('POST', '/rest/v1/kim_history', batch,
-                { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
+        const res = await _dbFetch('PATCH',
+            '/rest/v1/users?id=eq.' + currentUser.id, patch,
+            { 'Prefer': 'return=representation' });
+        if (res && res[0]) {
+            currentUser.display_name = res[0].display_name || currentUser.display_name;
         }
-        console.log('[CogneeSupabase v8.4.2] Синхронизировано ' + recent.length + ' КИМ-записей.');
+        return res?.[0] || null;
     }
 
-    async function saveKIMRemote(kim, zone, features) {
+    // ─── КИМ ─────────────────────────────────────────────────────────────────
+    async function syncKIMHistory() {
         if (!isAuthenticated()) return;
-        await _dbFetch('POST', '/rest/v1/kim_history', [{
-            user_id: currentUser.id, kim: Math.round(kim * 10) / 10,
-            zone, timestamp: new Date().toISOString(),
-            features_json: features ? JSON.stringify(features) : null
-        }], { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
+        const local = (window.CogneeStorage?.getHistory?.() || []).slice(-100);
+        if (!local.length) return;
+        const rows = local.map(h => ({
+            user_id:   currentUser.id,
+            kim:       h.kim,
+            zone:      h.zone || 'normal',
+            timestamp: h.timestamp || new Date().toISOString(),
+        }));
+        await _dbFetch('POST', '/rest/v1/kim_history', rows,
+            { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
     }
 
-    // ─── ГЕНЕРАТОР SLUG ──────────────────────────────────────────────────────
-    function _generateSlug() {
-        const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-        const arr = new Uint8Array(8);
-        crypto.getRandomValues(arr);
-        return Array.from(arr, b => chars[b % chars.length]).join('');
+    async function saveKIMRemote(kim, zone, ts) {
+        if (!isAuthenticated()) return;
+        const row = {
+            user_id:   currentUser.id,
+            kim:       parseFloat(kim.toFixed(1)),
+            zone:      zone || 'normal',
+            timestamp: ts  || new Date().toISOString(),
+        };
+        await _dbFetch('POST', '/rest/v1/kim_history', [row],
+            { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
     }
 
-    // ─── ПУБЛИКАЦИЯ СТАТЬИ ───────────────────────────────────────────────────
+    // ─── ИЗБРАННОЕ (v8.5) ────────────────────────────────────────────────────
+    async function addFavorite(articleId) {
+        if (!isAuthenticated()) throw new Error('Не авторизован');
+        await _dbFetch('POST', '/rest/v1/favorites',
+            [{ user_id: currentUser.id, article_id: articleId }]);
+    }
+
+    async function removeFavorite(articleId) {
+        if (!isAuthenticated()) throw new Error('Не авторизован');
+        await _dbFetch('DELETE',
+            '/rest/v1/favorites?article_id=eq.' + articleId +
+            '&user_id=eq.' + currentUser.id);
+    }
+
+    async function isFavorited(articleId) {
+        if (!isAuthenticated()) return false;
+        const res = await _dbFetch('GET',
+            '/rest/v1/favorites?article_id=eq.' + articleId +
+            '&user_id=eq.' + currentUser.id + '&select=id');
+        return Array.isArray(res) && res.length > 0;
+    }
+
+    async function getFavorites() {
+        if (!isAuthenticated()) return [];
+        const res = await _dbFetch('GET',
+            '/rest/v1/favorites?user_id=eq.' + currentUser.id +
+            '&select=id,article_id,created_at,articles(id,title,annotation,published_at)' +
+            '&order=created_at.desc');
+        return Array.isArray(res) ? res : [];
+    }
+
+    // ─── ЖАЛОБЫ (v8.5) ───────────────────────────────────────────────────────
+    async function submitReport(articleId, reason, comment) {
+        if (!isAuthenticated()) throw new Error('Не авторизован');
+        await _dbFetch('POST', '/rest/v1/reports', [{
+            article_id:  articleId,
+            reporter_id: currentUser.id,
+            reason:      reason,
+            comment:     comment || null,
+            status:      'pending',
+        }]);
+    }
+
+    // ─── МОДЕРАЦИЯ (v8.5) ────────────────────────────────────────────────────
+    async function isModerator() {
+        if (!isAuthenticated()) return false;
+        if (_isModeratorCache !== null) return _isModeratorCache;
+        const res = await _dbFetch('GET',
+            '/rest/v1/moderators?user_id=eq.' + currentUser.id +
+            '&is_active=eq.true&select=user_id');
+        _isModeratorCache = Array.isArray(res) && res.length > 0;
+        return _isModeratorCache;
+    }
+
+    async function getPendingReports(limit, offset) {
+        const res = await _rpc('get_pending_reports', {
+            p_limit:  limit  || 50,
+            p_offset: offset || 0,
+        });
+        return Array.isArray(res) ? res : [];
+    }
+
+    async function resolveReport(reportId, status, hideArticle) {
+        await _rpc('resolve_report', {
+            p_report_id:    reportId,
+            p_status:       status,
+            p_hide_article: !!hideArticle,
+        });
+    }
+
+    // ─── СТАТЬИ ──────────────────────────────────────────────────────────────
     async function publishArticle(data) {
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
-        await _upsertProfile();
 
-        const slug       = _generateSlug();
+        await _upsertProfile().catch(e => {
+            console.warn('[CogneeSupabase v8.5] upsert before publish:', e.message);
+        });
+
+        function _makeSlug(n) {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let s = '';
+            for (let i = 0; i < n; i++) s += chars[Math.floor(Math.random() * chars.length)];
+            return s;
+        }
+
+        const slug       = _makeSlug(8);
         const visibility = data.visibility === 'private' ? 'private' : 'public';
         const is_draft   = data.is_draft === true;
 
@@ -170,11 +250,10 @@
 
         if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
         const id = String(res[0].id);
-        console.log('[CogneeSupabase v8.4.2] Статья сохранена. id=' + id + ' slug=' + slug + ' visibility=' + visibility + ' is_draft=' + is_draft);
+        console.log('[CogneeSupabase v8.5] Статья сохранена. id=' + id + ' slug=' + slug);
         return { id, slug };
     }
 
-    // ─── ОБНОВЛЕНИЕ СТАТЬИ ───────────────────────────────────────────────────
     async function updateArticle(id, data) {
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
@@ -184,29 +263,22 @@
         if (patch.is_draft === false) patch.published_at = new Date().toISOString();
         await _dbFetch('PATCH',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id, patch);
-        console.log('[CogneeSupabase v8.4.2] Статья ' + id + ' обновлена.');
+        console.log('[CogneeSupabase v8.5] Статья ' + id + ' обновлена.');
     }
 
-    // ─── УДАЛЕНИЕ СТАТЬИ ─────────────────────────────────────────────────────
     async function deleteArticle(id) {
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
         await _dbFetch('DELETE',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id);
-        console.log('[CogneeSupabase v8.4.2] Статья ' + id + ' удалена.');
+        console.log('[CogneeSupabase v8.5] Статья ' + id + ' удалена.');
     }
 
-    // ─── ПОЛУЧИТЬ СТАТЬЮ ПО ID / SLUG ────────────────────────────────────────
-    // Числовой id: сначала пробуем как автор, потом как публичную.
-    //   Если ни то ни другое — возвращаем { _private: true } как сигнал для заглушки.
-    //   (Мы не раскрываем существование статьи анонимам, но заглушка лучше 404)
-    // Slug: вызываем RPC get_article_by_slug (SECURITY DEFINER, обходит RLS).
     async function getArticleById(id) {
         _requireConfig();
         const strId = String(id);
 
         if (/^\d+$/.test(strId)) {
-            // Авторизованный пользователь — пробуем получить свою статью
             if (isAuthenticated()) {
                 const mine = await _dbFetch('GET',
                     '/rest/v1/articles?id=eq.' + strId +
@@ -219,7 +291,6 @@
                 }
             }
 
-            // Публичная статья — для всех
             const pub = await _dbFetch('GET',
                 '/rest/v1/articles?id=eq.' + strId +
                 '&visibility=eq.public&is_draft=eq.false' +
@@ -230,12 +301,9 @@
                 return { ...a, author_name: a.users?.display_name || 'Автор' };
             }
 
-            // Ничего не нашли — возвращаем сигнал "приватная/недоступная"
-            // (не раскрываем разницу между "не существует" и "приватная")
             return { _private: true };
         }
 
-        // Slug — вызываем RPC
         if (/^[a-z0-9]{6,16}$/.test(strId)) {
             const res = await _rpc('get_article_by_slug', { p_slug: strId });
             if (res && res[0]) return { ...res[0], author_name: res[0].author_name || 'Автор' };
@@ -245,7 +313,6 @@
         return null;
     }
 
-    // ─── СПИСОК СТАТЕЙ ПОЛЬЗОВАТЕЛЯ (краткий, обратная совместимость) ────────
     async function getUserArticles() {
         if (!isAuthenticated()) return [];
         const res = await _dbFetch('GET',
@@ -254,39 +321,22 @@
         return Array.isArray(res) ? res : [];
     }
 
-    // ─── ПОЛНЫЙ СПИСОК СТАТЕЙ ДЛЯ ПРОФИЛЯ ───────────────────────────────────
-    // Сначала пробуем с новыми полями (v8.4).
-    // Если миграция не применялась — PostgREST вернёт ошибку.
-    // Fallback: запрос без visibility/is_draft/slug, добавляем дефолты на клиенте.
     async function getUserArticlesFull() {
         if (!isAuthenticated()) return [];
-
-        // Запрос с полями v8.4
         const res = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
             '&select=id,title,annotation,published_at,visibility,is_draft,slug' +
             '&order=published_at.desc');
-
         if (Array.isArray(res)) return res;
 
-        // Fallback: миграция ещё не применена — запрашиваем без новых полей
-        console.warn('[CogneeSupabase v8.4.2] Поля v8.4 недоступны — используем fallback. Примените supabase_migration_v8_4.sql!');
+        console.warn('[CogneeSupabase v8.5] Fallback getUserArticlesFull. Примените supabase_migration_v8_4.sql!');
         const fallback = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
             '&select=id,title,annotation,published_at&order=published_at.desc');
-
         if (!Array.isArray(fallback)) return [];
-
-        // Добавляем дефолтные поля чтобы профиль отобразился
-        return fallback.map(a => ({
-            ...a,
-            visibility: 'public',
-            is_draft:   false,
-            slug:       null,
-        }));
+        return fallback.map(a => ({ ...a, visibility: 'public', is_draft: false, slug: null }));
     }
 
-    // ─── КАТАЛОГ ПУБЛИЧНЫХ СТАТЕЙ ─────────────────────────────────────────────
     async function getPublicArticles(query, limit, offset) {
         _requireConfig();
         const res = await _rpc('search_public_articles', {
@@ -299,19 +349,14 @@
 
     // ─── HTTP-УТИЛИТЫ ────────────────────────────────────────────────────────
     function _requireConfig() {
-        if (!supabaseUrl || !supabaseKey) {
-            throw new Error('[CogneeSupabase] Supabase не настроен. Добавь ключи в config.js');
-        }
+        if (!supabaseUrl || !supabaseKey)
+            throw new Error('[CogneeSupabase v8.5] Supabase не настроен. Добавь ключи в config.js');
     }
 
     async function _fetch(path, method, body, withAuth) {
-        const headers = {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-        };
-        if (withAuth && currentSession) {
+        const headers = { 'Content-Type': 'application/json', 'apikey': supabaseKey };
+        if (withAuth && currentSession)
             headers['Authorization'] = 'Bearer ' + currentSession.access_token;
-        }
         const res = await fetch(supabaseUrl + path, {
             method, headers,
             body: body ? JSON.stringify(body) : undefined,
@@ -326,17 +371,14 @@
 
     async function _dbFetch(method, path, body, extraHeaders) {
         if (!supabaseUrl || !supabaseKey) return null;
-
         const headers = {
             'Content-Type': 'application/json',
             'apikey':  supabaseKey,
             'Prefer':  'return=minimal',
         };
         if (method === 'GET') headers['Accept'] = 'application/json';
-        if (currentSession?.access_token) {
+        if (currentSession?.access_token)
             headers['Authorization'] = 'Bearer ' + currentSession.access_token;
-        }
-        // extraHeaders перезаписывает дефолты (в т.ч. Prefer)
         if (extraHeaders) Object.assign(headers, extraHeaders);
 
         const res = await fetch(supabaseUrl + path, {
@@ -344,7 +386,6 @@
             body: body ? JSON.stringify(body) : undefined,
         });
 
-        // 401 → обновляем токен и повторяем один раз
         if (res.status === 401 && currentSession?.refresh_token) {
             const ok = await _refreshToken();
             if (ok) return _dbFetch(method, path, body, extraHeaders);
@@ -353,10 +394,12 @@
 
         if (!res.ok && res.status !== 204) {
             const err = await res.json().catch(() => ({}));
-            // Подробное логирование для диагностики (видно в консоли браузера)
-            console.warn('[CogneeSupabase v8.4.2] DB error ' + res.status,
+            console.warn('[CogneeSupabase v8.5] DB error ' + res.status,
                 method, path.split('?')[0], err?.message || err?.hint || JSON.stringify(err));
-            return null;
+            // Бросаем ошибку с кодом — нужно для обработки duplicate в submitReport
+            const e = new Error(err?.message || 'DB error ' + res.status);
+            e.code  = err?.code || String(res.status);
+            throw e;
         }
 
         const text = await res.text();
@@ -365,75 +408,59 @@
 
     async function _rpc(fnName, params) {
         if (!supabaseUrl || !supabaseKey) return null;
-        const headers = {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-        };
-        if (currentSession?.access_token) {
+        const headers = { 'Content-Type': 'application/json', 'apikey': supabaseKey };
+        if (currentSession?.access_token)
             headers['Authorization'] = 'Bearer ' + currentSession.access_token;
-        }
         const res = await fetch(supabaseUrl + '/rest/v1/rpc/' + fnName, {
             method: 'POST', headers,
             body: JSON.stringify(params || {}),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            console.warn('[CogneeSupabase v8.4.2] RPC ' + fnName + ' error ' + res.status,
+            console.warn('[CogneeSupabase v8.5] RPC ' + fnName + ' error ' + res.status,
                 err?.message || err?.hint || JSON.stringify(err));
-            return null;
+            const e = new Error(err?.message || 'RPC error ' + res.status);
+            e.code  = err?.code || String(res.status);
+            throw e;
         }
         const text = await res.text();
-        return text ? JSON.parse(text) : [];
+        return text ? JSON.parse(text) : {};
     }
 
+    // ─── ТОКЕНЫ ──────────────────────────────────────────────────────────────
     async function _verifyToken(token) {
-        try {
-            const res = await fetch(supabaseUrl + '/auth/v1/user', {
-                headers: { 'apikey': supabaseKey, 'Authorization': 'Bearer ' + token }
-            });
-            if (!res.ok) return null;
-            const data = await res.json();
-            return data.id
-                ? { id: data.id, email: data.email, display_name: data.user_metadata?.display_name }
-                : null;
-        } catch (e) { return null; }
+        const res = await _fetch('/auth/v1/user', 'GET', null, false);
+        // _fetch не передаёт токен без withAuth — делаем вручную
+        const headers = { 'Content-Type': 'application/json', 'apikey': supabaseKey,
+            'Authorization': 'Bearer ' + token };
+        const r = await fetch(supabaseUrl + '/auth/v1/user', { headers });
+        if (!r.ok) return null;
+        const data = await r.json();
+        return data?.id ? _extractUser({ user: data }) : null;
     }
 
-    // ─── ОБНОВЛЕНИЕ ТОКЕНА ───────────────────────────────────────────────────
-    let _refreshPromise = null;
-
+    let _refreshPromise2 = null; // отдельный промис чтобы не конфликтовать с полем модуля
     async function _refreshToken() {
-        if (!currentSession?.refresh_token) { _clearSession(); return false; }
-        if (_refreshPromise) return _refreshPromise;
-
-        _refreshPromise = (async () => {
+        if (_refreshPromise2) return _refreshPromise2;
+        _refreshPromise2 = (async () => {
             try {
-                const res = await fetch(supabaseUrl + '/auth/v1/token?grant_type=refresh_token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'apikey': supabaseKey },
-                    body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
-                });
-                if (!res.ok) {
-                    console.warn('[CogneeSupabase v8.4.2] Refresh failed ' + res.status + ' — выход');
-                    _clearSession();
-                    _dispatchAuthEvent('signed_out', null);
-                    return false;
-                }
-                const data = await res.json();
-                _saveSession(data);
-                if (data.user) currentUser = _extractUser(data);
-                console.log('[CogneeSupabase v8.4.2] Токен обновлён.');
+                const res = await _fetch('/auth/v1/token?grant_type=refresh_token', 'POST',
+                    { refresh_token: currentSession.refresh_token });
+                if (res.error || !res.access_token) { _clearSession(); return false; }
+                _saveSession(res);
+                currentUser = _extractUser(res);
+                console.log('[CogneeSupabase v8.5] Токен обновлён');
+                setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                 return true;
             } catch (e) {
-                console.warn('[CogneeSupabase v8.4.2] Refresh error:', e.message);
+                console.warn('[CogneeSupabase v8.5] Refresh error:', e.message);
                 _clearSession();
                 return false;
             } finally {
-                _refreshPromise = null;
+                _refreshPromise2 = null;
             }
         })();
-
-        return _refreshPromise;
+        return _refreshPromise2;
     }
 
     function _saveSession(data) {
@@ -463,10 +490,6 @@
         };
         const res = await _dbFetch('POST', '/rest/v1/users', [profile],
             { 'Prefer': 'resolution=merge-duplicates,return=minimal' });
-        if (res === null) {
-            await _dbFetch('POST', '/rest/v1/users', [profile],
-                { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
-        }
         return profile;
     }
 
@@ -476,11 +499,24 @@
 
     // ─── ЭКСПОРТ ─────────────────────────────────────────────────────────────
     window.CogneeSupabase = {
-        init, signUp, signIn, signOut, getUser, isAuthenticated,
-        syncKIMHistory, saveKIMRemote, getUserProfile, updateProfile,
+        // Auth
+        init, signUp, signIn, signOut, getUser, getCurrentUser, isAuthenticated,
+        // КИМ
+        syncKIMHistory, saveKIMRemote,
+        // Профиль
+        getUserProfile, updateProfile,
+        // Статьи
         publishArticle, getArticleById, getUserArticles, getUserArticlesFull,
         updateArticle, deleteArticle, getPublicArticles,
+        // Избранное (v8.5)
+        addFavorite, removeFavorite, isFavorited, getFavorites,
+        // Жалобы (v8.5)
+        submitReport,
+        // Модерация (v8.5)
+        isModerator, getPendingReports, resolveReport,
+        // Низкоуровневые (используются в reader/moderation inline-скриптах)
+        _dbFetch, _rpc,
     };
 
-    console.log('[CogneeSupabase v8.4.2] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v8.5] Загружен. Ожидает init().');
 })();
