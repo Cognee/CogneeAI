@@ -1,4 +1,4 @@
-<!-- editor.html — v8.4 | Глобальная версия: 8.4 -->
+<!-- editor.html — v8.4.2 | Глобальная версия: 8.4 -->
 <!-- Блок 4: Редактор статей. Видимость (public/private), черновики, редактирование существующей статьи. -->
 <!-- Публикация через CogneeAI (Gemini): упрощение, ключевые слова, аннотация. -->
 <!DOCTYPE html>
@@ -490,7 +490,7 @@
 <script src="gemini.js"></script>
 
 <script>
-// editor.js inline — v8.4
+// editor.js inline — v8.4.2
 (function(){
 'use strict';
 
@@ -502,13 +502,14 @@ const S = {
     annotation: '',
     visibility: 'public',
     DRAFT_KEY:  'cognee_editor_draft',
-    editId:     null,  // числовой ID статьи при редактировании
+    editId:     null,  // числовой ID при редактировании существующей статьи
+    draftId:    null,  // числовой ID при сохранении черновика (чтобы не дублировать)
 };
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
     await initAuth();
-    checkEditMode();
+    await checkEditMode();
     restoreDraft();
     setupCounters();
     setupToolbar();
@@ -665,21 +666,34 @@ window.saveDraft = async function() {
     const btn = document.getElementById('btn-draft');
     btn.disabled = true; btn.textContent = '💾 Сохраняем…';
 
-    // Сохраняем в Supabase как черновик (is_draft=true)
     if (window.CogneeSupabase && window.CogneeSupabase.isAuthenticated() && title && content) {
         try {
-            await window.CogneeSupabase.publishArticle({
-                title,
-                content,
-                content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
-                keywords:   S.keywords,
-                annotation: S.annotation,
-                visibility: S.visibility,
-                is_draft:   true,
-            });
-            showToast('✓ Черновик сохранён в облаке');
+            if (S.draftId) {
+                // Обновляем существующий черновик — не создаём новый
+                await window.CogneeSupabase.updateArticle(S.draftId, {
+                    title, content,
+                    content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
+                    keywords:   S.keywords.length   ? S.keywords   : undefined,
+                    annotation: S.annotation        ? S.annotation  : undefined,
+                    visibility: S.visibility,
+                    is_draft:   true,
+                });
+                showToast('✓ Черновик обновлён');
+            } else {
+                // Первое сохранение — создаём новую запись
+                const result = await window.CogneeSupabase.publishArticle({
+                    title, content,
+                    content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
+                    keywords:   S.keywords,
+                    annotation: S.annotation,
+                    visibility: S.visibility,
+                    is_draft:   true,
+                });
+                S.draftId = result.id;
+                showToast('✓ Черновик сохранён в облаке');
+            }
         } catch(e) {
-            // Fallback: localStorage
+            console.warn('[Editor] Ошибка сохранения в Supabase:', e.message);
             _saveDraftLocal(title, content);
         }
     } else {
@@ -688,7 +702,6 @@ window.saveDraft = async function() {
 
     btn.disabled = false; btn.textContent = '💾 Сохранить черновик';
 };
-
 function _saveDraftLocal(title, content) {
     try {
         localStorage.setItem(S.DRAFT_KEY, JSON.stringify({ title, content, visibility: S.visibility }));
@@ -706,8 +719,8 @@ window.processWithAI = async function() {
     if (!title)   { showToast('Введи название статьи'); return; }
     if (content.length < 100) { showToast('Текст слишком короткий (мин. 100 символов)'); return; }
 
-    if (!window.CogneeGemini) {
-        showToast('Gemini API не подключён');
+    if (!window.CogneeAI) {
+        showToast('CogneeAI не подключён — проверь gemini.js');
         return;
     }
 
@@ -742,19 +755,19 @@ window.processWithAI = async function() {
 
         // 2. Упрощение через Gemini
         setStep('step-simplify', 'active');
-        const simplified = await window.CogneeGemini.simplifyParagraphs(paragraphs);
+        const simplified = await window.CogneeAI.simplifyParagraphs(paragraphs);
         S.simplified = simplified;
         setStep('step-simplify', 'done');
 
         // 3. Ключевые слова
         setStep('step-keywords', 'active');
-        const keywords = await window.CogneeGemini.extractKeywords(title + '\n\n' + content);
+        const keywords = await window.CogneeAI.extractKeywords(title + '\n\n' + content);
         S.keywords = keywords;
         setStep('step-keywords', 'done');
 
         // 4. Аннотация
         setStep('step-annotation', 'active');
-        const annotation = await window.CogneeGemini.generateAnnotation(title, content);
+        const annotation = await window.CogneeAI.generateAnnotation(title, content);
         S.annotation = annotation;
         setStep('step-annotation', 'done');
 
@@ -799,8 +812,7 @@ window.doPublish = async function() {
     if (!content) { showToast('Введи текст статьи'); return; }
 
     if (!window.CogneeSupabase || !window.CogneeSupabase.isAuthenticated()) {
-        showToast('Нужна авторизация');
-        return;
+        showToast('Нужна авторизация'); return;
     }
 
     const btn = document.getElementById('btn-publish');
@@ -812,59 +824,67 @@ window.doPublish = async function() {
 
     try {
         if (S.editId) {
-            // Режим редактирования — обновляем существующую статью
+            // Редактирование существующей статьи
             await window.CogneeSupabase.updateArticle(S.editId, {
-                title,
-                content,
+                title, content,
                 content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
                 keywords:   S.keywords.length   ? S.keywords   : undefined,
                 annotation: S.annotation        ? S.annotation  : undefined,
                 visibility: S.visibility,
                 is_draft:   false,
             });
+            _showPublishSuccess(pubStatus, 'reader.html?id=' + S.editId, S.visibility, null, true);
 
-            const articleUrl = `reader.html?id=${S.editId}`;
-            _showPublishSuccess(pubStatus, articleUrl, S.visibility, null, true);
+        } else if (S.draftId) {
+            // Публикация сохранённого черновика — обновляем is_draft=false
+            await window.CogneeSupabase.updateArticle(S.draftId, {
+                title, content,
+                content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
+                keywords:   S.keywords.length   ? S.keywords   : undefined,
+                annotation: S.annotation        ? S.annotation  : undefined,
+                visibility: S.visibility,
+                is_draft:   false,
+            });
+            // Нужен slug для приватной ссылки — грузим статью
+            let articleUrl;
+            if (S.visibility === 'private') {
+                try {
+                    const saved = await window.CogneeSupabase.getArticleById(S.draftId);
+                    articleUrl = saved && saved.slug ? 'reader.html?id=' + saved.slug : 'reader.html?id=' + S.draftId;
+                } catch(e) { articleUrl = 'reader.html?id=' + S.draftId; }
+            } else {
+                articleUrl = 'reader.html?id=' + S.draftId;
+            }
+            try { localStorage.removeItem(S.DRAFT_KEY); } catch(e) {}
+            _showPublishSuccess(pubStatus, articleUrl, S.visibility, null, false);
 
         } else {
             // Новая статья
             const result = await window.CogneeSupabase.publishArticle({
-                title,
-                content,
+                title, content,
                 content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
                 keywords:   S.keywords,
                 annotation: S.annotation,
                 visibility: S.visibility,
                 is_draft:   false,
             });
-
-            // Очищаем черновик после успешной публикации
             try { localStorage.removeItem(S.DRAFT_KEY); } catch(e) {}
-
-            // Формируем ссылку в зависимости от видимости
-            let articleUrl;
-            if (S.visibility === 'private') {
-                articleUrl = `reader.html?id=${result.slug}`;
-            } else {
-                articleUrl = `reader.html?id=${result.id}`;
-            }
-
+            const articleUrl = S.visibility === 'private'
+                ? 'reader.html?id=' + result.slug
+                : 'reader.html?id=' + result.id;
             _showPublishSuccess(pubStatus, articleUrl, S.visibility, result.slug, false);
         }
 
     } catch(e) {
         pubStatus.classList.add('vis');
-        pubStatus.innerHTML = `
-            <div class="status-card err">
-                <div class="status-title">⚠ Ошибка публикации</div>
-                <div style="font-size:13px;color:var(--muted)">${_esc(e.message)}</div>
-            </div>`;
+        pubStatus.innerHTML = '<div class="status-card err">' +
+            '<div class="status-title">⚠ Ошибка публикации</div>' +
+            '<div style="font-size:13px;color:var(--muted)">' + _esc(e.message) + '</div></div>';
     }
 
     btn.disabled = false;
     btn.textContent = S.editId ? '💾 Сохранить изменения' : '🚀 Опубликовать';
 };
-
 function _showPublishSuccess(pubStatus, articleUrl, visibility, slug, isEdit) {
     pubStatus.classList.add('vis');
 

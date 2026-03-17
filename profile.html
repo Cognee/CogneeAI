@@ -1,5 +1,5 @@
-<!-- profile.html — v8.3.1.1 | Глобальная версия: 8.2 -->
-<!-- Блок 2: Личный кабинет. КИМ-профиль, история из Supabase, выход. -->
+<!-- profile.html — v8.4 | Глобальная версия: 8.4 -->
+<!-- Блок 4: Личный кабинет. КИМ-профиль + список всех статей и черновиков с действиями. -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -28,346 +28,283 @@
             --focus:    #4FC3F7;
             --normal:   #81C784;
             --tired:    #FFB74D;
+            --danger:   #EF5350;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body {
             font-family: 'Lora', Georgia, serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 0 0 80px;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; padding: 0 0 80px;
         }
 
         /* ─── Шапка ─── */
         .profile-header {
-            background: var(--surface2);
-            border-bottom: 1px solid var(--border);
-            padding: 20px 32px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            background: var(--surface2); border-bottom: 1px solid var(--border);
+            padding: 20px 32px; display: flex; align-items: center;
+            justify-content: space-between; position: sticky; top: 0; z-index: 100;
         }
-
         .profile-header-logo {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 18px;
-            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600;
             background: linear-gradient(135deg, #4FC3F7, #7C4DFF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-decoration: none;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; text-decoration: none;
         }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
+        .header-actions { display: flex; align-items: center; gap: 12px; }
         .btn-link {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted);
-            text-decoration: none;
-            padding: 7px 14px;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 20px;
-            transition: color 0.2s, border-color 0.2s;
-            cursor: pointer;
-            background: none;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+            color: var(--muted); text-decoration: none; padding: 7px 14px;
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; transition: all 0.2s;
         }
+        .btn-link:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+        .btn-editor { color: var(--accent); border-color: rgba(79,195,247,0.25); }
+        .btn-editor:hover { background: rgba(79,195,247,0.07); }
+        .btn-signout { background: transparent; cursor: pointer; }
+        .btn-signout:hover { color: var(--danger); border-color: var(--danger); }
 
-        .btn-link:hover {
-            color: var(--accent);
-            border-color: rgba(79,195,247,0.4);
-        }
-
-        .btn-signout {
-            color: #ef9a9a;
-            border-color: rgba(239,83,80,0.2);
-        }
-
-        .btn-signout:hover {
-            color: #ef5350;
-            border-color: rgba(239,83,80,0.5);
-        }
-
-        .btn-editor {
-            color: var(--accent);
-            border-color: rgba(79,195,247,0.25);
-        }
-
-        .btn-editor:hover {
-            color: #fff;
-            background: rgba(79,195,247,0.12);
-            border-color: rgba(79,195,247,0.5);
-        }
-
-        /* ─── Основной контент ─── */
-        .profile-body {
-            max-width: 720px;
-            margin: 0 auto;
-            padding: 40px 24px;
-        }
+        /* ─── Тело ─── */
+        .profile-body { max-width: 800px; margin: 0 auto; padding: 32px 24px; }
 
         /* ─── Карточка пользователя ─── */
         .user-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 32px;
-            margin-bottom: 28px;
-            display: flex;
-            align-items: center;
-            gap: 24px;
+            display: flex; align-items: center; gap: 20px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 24px; margin-bottom: 32px;
         }
-
         .user-avatar {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4FC3F722, #7C4DFF22);
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            flex-shrink: 0;
+            width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+            background: linear-gradient(135deg, #7C4DFF, #4FC3F7);
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: #fff;
         }
-
-        .user-info { flex: 1; }
-
         .user-name {
-            font-size: 22px;
-            font-weight: 600;
-            color: var(--text);
-            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: var(--text);
         }
-
-        .user-email {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--muted);
-        }
-
+        .user-email { font-size: 13px; color: var(--muted); margin-top: 3px; }
         .user-badge {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--accent);
-            background: rgba(79,195,247,0.1);
-            border: 1px solid rgba(79,195,247,0.25);
-            border-radius: 12px;
-            padding: 3px 10px;
-            margin-top: 8px;
-            display: inline-block;
-            letter-spacing: 0.06em;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+            color: var(--accent); background: rgba(79,195,247,0.07);
+            border: 1px solid rgba(79,195,247,0.2); border-radius: 4px;
+            padding: 2px 8px; display: inline-block; margin-top: 8px;
         }
 
         /* ─── Секции ─── */
         .section-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--muted);
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            margin-bottom: 16px;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+            margin-bottom: 16px; margin-top: 32px;
         }
 
-        /* ─── Статистика КИМ (3 карточки) ─── */
-        .kim-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-
+        /* ─── КИМ-статистика ─── */
+        .kim-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px; }
         .kim-stat-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px 18px;
         }
-
         .kim-stat-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--muted);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px;
         }
-
         .kim-stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 32px;
-            font-weight: 600;
-            line-height: 1;
+            font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700;
         }
-
         .kim-stat-value.focus  { color: var(--focus); }
         .kim-stat-value.normal { color: var(--normal); }
         .kim-stat-value.tired  { color: var(--tired); }
         .kim-stat-value.neutral { color: var(--text); }
+        .kim-stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
-        .kim-stat-sub {
-            font-size: 12px;
-            color: var(--muted);
-            margin-top: 6px;
-            font-style: italic;
-        }
-
-        /* ─── График часов ─── */
+        /* ─── Графики ─── */
         .chart-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 28px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 18px 20px; margin-bottom: 12px;
         }
-
         .chart-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--muted);
-            letter-spacing: 0.06em;
-            margin-bottom: 20px;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px;
         }
-
         .hour-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 3px;
-            height: 80px;
+            display: flex; align-items: flex-end; gap: 2px; height: 60px;
         }
-
-        .hour-bar-wrap {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            height: 100%;
-            justify-content: flex-end;
-        }
-
-        .hour-bar {
-            width: 100%;
-            min-height: 3px;
-            border-radius: 2px 2px 0 0;
-            transition: height 0.6s ease;
-        }
-
+        .hour-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .hour-bar { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.3s; min-height: 3px; }
         .hour-label {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 8px;
-            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace; font-size: 8px;
+            color: var(--muted); margin-top: 4px;
         }
 
         /* ─── Синхронизация ─── */
         .sync-status {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px 24px;
-            margin-bottom: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px 20px; margin-bottom: 32px;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
         }
-
-        .sync-info {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: var(--text);
-        }
-
-        .sync-sub {
-            font-size: 11px;
-            color: var(--muted);
-            margin-top: 4px;
-        }
-
+        .sync-info { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); }
+        .sync-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
         .btn-sync {
-            background: linear-gradient(135deg, #4FC3F7, #7C4DFF);
-            border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 10px 20px;
-            cursor: pointer;
-            transition: opacity 0.2s, transform 0.1s;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            background: rgba(79,195,247,0.08); border: 1px solid rgba(79,195,247,0.25);
+            border-radius: 6px; padding: 6px 14px; color: var(--accent); cursor: pointer; transition: all 0.2s;
             white-space: nowrap;
         }
+        .btn-sync:hover:not(:disabled) { background: rgba(79,195,247,0.15); }
+        .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-sync:hover  { opacity: 0.9; }
-        .btn-sync:active { transform: scale(0.97); }
-        .btn-sync:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* ─── СТАТЬИ ─── */
+        .articles-header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+        }
+        .articles-header .section-title { margin: 0; }
+        .btn-new-article {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            background: rgba(79,195,247,0.08); border: 1px solid rgba(79,195,247,0.25);
+            border-radius: 6px; padding: 6px 14px; color: var(--accent);
+            text-decoration: none; transition: all 0.2s;
+        }
+        .btn-new-article:hover { background: rgba(79,195,247,0.15); }
 
-        /* ─── Не авторизован ─── */
+        .articles-list { display: flex; flex-direction: column; gap: 10px; }
+        .article-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px 20px;
+            transition: border-color 0.2s;
+        }
+        .article-card:hover { border-color: rgba(79,195,247,0.3); }
+        .article-card-top {
+            display: flex; align-items: flex-start;
+            justify-content: space-between; gap: 12px;
+        }
+        .article-card-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;
+            color: var(--text); text-decoration: none; line-height: 1.4; flex: 1;
+        }
+        .article-card-title:hover { color: var(--accent); }
+        .article-badges { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .badge {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px;
+            letter-spacing: 0.06em; text-transform: uppercase;
+            border-radius: 4px; padding: 2px 7px;
+        }
+        .badge-draft    { background: rgba(255,183,77,0.1);  color: #FFB74D; border: 1px solid rgba(255,183,77,0.25); }
+        .badge-public   { background: rgba(79,195,247,0.08); color: var(--accent); border: 1px solid rgba(79,195,247,0.2); }
+        .badge-private  { background: rgba(124,77,255,0.1);  color: #b39ddb; border: 1px solid rgba(124,77,255,0.25); }
+        .article-card-meta {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: var(--muted); margin-top: 6px;
+        }
+        .article-card-annotation {
+            font-size: 13px; color: var(--muted); margin-top: 6px;
+            line-height: 1.5; font-style: italic;
+            display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .article-card-actions {
+            display: flex; gap: 8px; margin-top: 12px;
+            padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .btn-action {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            background: transparent; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 5px; padding: 5px 12px; color: var(--muted);
+            cursor: pointer; transition: all 0.2s; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 5px;
+        }
+        .btn-action:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+        .btn-action.edit:hover  { color: var(--accent); border-color: rgba(79,195,247,0.4); }
+        .btn-action.delete      { margin-left: auto; }
+        .btn-action.delete:hover { color: var(--danger); border-color: rgba(239,83,80,0.4); }
+        .btn-action.read:hover  { color: var(--normal); border-color: rgba(129,199,132,0.4); }
+
+        /* Пустое состояние статей */
+        .articles-empty {
+            text-align: center; padding: 50px 20px;
+            background: var(--surface); border: 1px dashed var(--border);
+            border-radius: 12px;
+        }
+        .articles-empty-icon { font-size: 36px; margin-bottom: 12px; }
+        .articles-empty-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            color: var(--text); margin-bottom: 8px;
+        }
+        .articles-empty-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+        .btn-primary-sm {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            background: var(--accent); color: #0a0e17; font-weight: 700;
+            border: none; border-radius: 7px; padding: 9px 20px;
+            text-decoration: none; display: inline-block; cursor: pointer;
+        }
+
+        /* Скелетон загрузки статей */
+        .articles-loading {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: var(--muted); text-align: center; padding: 30px;
+        }
+
+        /* ─── AUTH PROMPT ─── */
         .auth-prompt {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 48px 32px;
-            text-align: center;
+            text-align: center; padding: 100px 24px 60px;
         }
-
         .auth-prompt-emoji { font-size: 48px; margin-bottom: 16px; }
-        .auth-prompt-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-        .auth-prompt-sub { color: var(--muted); font-size: 15px; margin-bottom: 28px; font-style: italic; }
-
-        .btn-primary {
-            display: inline-block;
-            background: linear-gradient(135deg, #4FC3F7, #7C4DFF);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            font-weight: 600;
-            padding: 14px 32px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: opacity 0.2s;
+        .auth-prompt-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;
+            color: var(--text); margin-bottom: 10px;
         }
-        .btn-primary:hover { opacity: 0.9; }
+        .auth-prompt-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+        .btn-primary {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+            background: var(--accent); color: #0a0e17; border: none;
+            border-radius: 8px; padding: 12px 28px; text-decoration: none; display: inline-block;
+        }
 
         /* ─── Загрузка ─── */
         .loading {
-            text-align: center;
-            color: var(--muted);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            padding: 60px 0;
+            text-align: center; color: var(--muted);
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 60px 0;
         }
-
         .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(79,195,247,0.2);
-            border-top-color: #4FC3F7;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-bottom: 12px;
+            display: inline-block; width: 20px; height: 20px;
+            border: 2px solid rgba(79,195,247,0.2); border-top-color: #4FC3F7;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
         }
-
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Диалог подтверждения ─── */
+        .confirm-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.7); align-items: center; justify-content: center;
+        }
+        .confirm-overlay.vis { display: flex; }
+        .confirm-dialog {
+            background: #131820; border: 1px solid rgba(239,83,80,0.3);
+            border-radius: 14px; padding: 28px 32px; max-width: 380px; width: 90%; text-align: center;
+        }
+        .confirm-icon { font-size: 36px; margin-bottom: 12px; }
+        .confirm-title {
+            font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700;
+            color: var(--text); margin-bottom: 8px;
+        }
+        .confirm-sub { font-size: 13px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+        .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+        .btn-cancel {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            background: transparent; border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 7px; padding: 9px 20px; color: var(--muted); cursor: pointer;
+        }
+        .btn-cancel:hover { color: var(--text); }
+        .btn-confirm-delete {
+            font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;
+            background: rgba(239,83,80,0.15); border: 1px solid rgba(239,83,80,0.4);
+            border-radius: 7px; padding: 9px 20px; color: var(--danger); cursor: pointer;
+        }
+        .btn-confirm-delete:hover { background: rgba(239,83,80,0.25); }
+
+        @media (max-width: 600px) {
+            .profile-header { padding: 16px; }
+            .profile-body { padding: 20px 16px; }
+            .kim-stats { grid-template-columns: 1fr 1fr; }
+            .sync-status { flex-direction: column; align-items: flex-start; }
+            .article-card-top { flex-direction: column; }
+            .article-badges { align-self: flex-start; }
+        }
     </style>
 </head>
 <body>
@@ -375,12 +312,25 @@
 <header class="profile-header">
     <a class="profile-header-logo" href="index.html">Cognee</a>
     <div class="header-actions">
-        <a class="btn-link" href="index.html">← Читать</a>
+        <a class="btn-link" href="catalog.html">📚 Каталог</a>
         <a class="btn-link" href="dashboard.html">📊 Дашборд</a>
-        <a class="btn-link btn-editor" href="editor.html">✍ Редактор</a>
+        <a class="btn-link btn-editor" href="editor.html">✍ Написать</a>
         <button class="btn-link btn-signout" id="signout-btn" onclick="handleSignOut()" style="display:none">Выйти</button>
     </div>
 </header>
+
+<!-- Диалог подтверждения удаления -->
+<div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-dialog">
+        <div class="confirm-icon">🗑</div>
+        <div class="confirm-title">Удалить статью?</div>
+        <div class="confirm-sub" id="confirm-sub">Это действие необратимо.<br>Статья будет удалена навсегда.</div>
+        <div class="confirm-actions">
+            <button class="btn-cancel" onclick="closeConfirm()">Отмена</button>
+            <button class="btn-confirm-delete" id="btn-confirm-delete">Удалить</button>
+        </div>
+    </div>
+</div>
 
 <main class="profile-body" id="profile-main">
     <div class="loading" id="loading-state">
@@ -396,25 +346,18 @@
     const main = document.getElementById('profile-main');
     const signoutBtn = document.getElementById('signout-btn');
 
-    // Инициализируем Supabase
     const hasSupabase = !!(window.COGNEE_SUPABASE_URL && window.COGNEE_SUPABASE_KEY);
-
-    if (hasSupabase) {
-        await CogneeSupabase.init();
-    }
+    if (hasSupabase) await CogneeSupabase.init();
 
     const isAuth = hasSupabase && CogneeSupabase.isAuthenticated();
 
-    if (!isAuth) {
-        _renderGuest(main, hasSupabase);
-        return;
-    }
+    if (!isAuth) { _renderGuest(main, hasSupabase); return; }
 
     signoutBtn.style.display = 'inline-block';
-    _renderProfile(main, CogneeSupabase.getUser());
+    await _renderProfile(main, CogneeSupabase.getUser());
 })();
 
-// ─── Рендер гостя ────────────────────────────────────────────────────────
+// ─── Гость ───────────────────────────────────────────────────────────────────
 function _renderGuest(main, hasSupabase) {
     main.innerHTML = `
         <div class="auth-prompt">
@@ -426,33 +369,21 @@ function _renderGuest(main, hasSupabase) {
                     : 'Supabase не настроен. Добавь ключи в config.js для работы авторизации.'}
             </div>
             <a class="btn-primary" href="auth.html">Войти / Зарегистрироваться</a>
-        </div>
-    `;
+        </div>`;
 }
 
-// ─── Рендер профиля ───────────────────────────────────────────────────────
-function _renderProfile(main, user) {
+// ─── Профиль ─────────────────────────────────────────────────────────────────
+async function _renderProfile(main, user) {
     const history     = window.CogneeStorage ? window.CogneeStorage.getHistory() : [];
     const hourlyStats = window.CogneeStorage ? window.CogneeStorage.getHourlyStats() : new Array(24).fill(0);
     const bestHour    = window.CogneeStorage ? window.CogneeStorage.getBestHour() : -1;
     const worstHour   = window.CogneeStorage ? window.CogneeStorage.getWorstHour() : -1;
 
-    // Средний КИМ
     const avgKIM = history.length > 0
-        ? Math.round(history.reduce((s, r) => s + r.kim, 0) / history.length)
-        : null;
+        ? Math.round(history.reduce((s,r) => s + r.kim, 0) / history.length) : null;
+    const kimClass = avgKIM === null ? 'neutral' : avgKIM > 70 ? 'focus' : avgKIM >= 40 ? 'normal' : 'tired';
+    const kimZoneLabel = avgKIM === null ? '—' : avgKIM > 70 ? 'Поток' : avgKIM >= 40 ? 'Норма' : 'Усталость';
 
-    const kimClass = avgKIM === null ? 'neutral'
-        : avgKIM > 70 ? 'focus'
-        : avgKIM >= 40 ? 'normal'
-        : 'tired';
-
-    const kimZoneLabel = avgKIM === null ? '—'
-        : avgKIM > 70 ? 'Поток'
-        : avgKIM >= 40 ? 'Норма'
-        : 'Усталость';
-
-    // Распределение зон
     const zones = { focus: 0, normal: 0, tired: 0 };
     history.forEach(r => { if (zones[r.zone] !== undefined) zones[r.zone]++; });
     const total = history.length || 1;
@@ -460,11 +391,9 @@ function _renderProfile(main, user) {
     const normalPct = Math.round(zones.normal / total * 100);
     const tiredPct  = Math.round(zones.tired  / total * 100);
 
-    // Инициалы для аватара
     const initials = (user.display_name || user.email || '?').charAt(0).toUpperCase();
 
     main.innerHTML = `
-        <!-- Пользователь -->
         <div class="user-card">
             <div class="user-avatar">${initials}</div>
             <div class="user-info">
@@ -474,7 +403,6 @@ function _renderProfile(main, user) {
             </div>
         </div>
 
-        <!-- КИМ-статистика -->
         <div class="section-title">Когнитивный профиль</div>
         <div class="kim-stats">
             <div class="kim-stat-card">
@@ -494,23 +422,20 @@ function _renderProfile(main, user) {
             </div>
         </div>
 
-        <!-- Распределение зон -->
         <div class="chart-card">
             <div class="chart-title">РАСПРЕДЕЛЕНИЕ ЗОН (%)</div>
-            <div style="display:flex; gap:12px; margin-bottom:16px;">
-                ${_zoneBar('⚡ Поток', focusPct, '#4FC3F7')}
-                ${_zoneBar('☁ Норма', normalPct, '#81C784')}
-                ${_zoneBar('🌙 Усталость', tiredPct, '#FFB74D')}
+            <div style="display:flex;gap:12px;margin-bottom:16px">
+                ${_zoneBar('⚡ Поток',    focusPct,  '#4FC3F7')}
+                ${_zoneBar('☁ Норма',    normalPct, '#81C784')}
+                ${_zoneBar('🌙 Усталость', tiredPct,  '#FFB74D')}
             </div>
         </div>
 
-        <!-- КИМ по часам -->
         <div class="chart-card">
             <div class="chart-title">КИМ ПО ЧАСАМ СУТОК</div>
             <div class="hour-bars" id="hour-bars"></div>
         </div>
 
-        <!-- Синхронизация -->
         <div class="sync-status">
             <div>
                 <div class="sync-info">☁ Синхронизация с облаком</div>
@@ -518,68 +443,184 @@ function _renderProfile(main, user) {
             </div>
             <button class="btn-sync" id="sync-btn" onclick="handleSync()">Синхронизировать</button>
         </div>
-    `;
 
-    // Рисуем почасовой график
-    _renderHourBars(hourlyStats);
-}
-
-function _zoneBar(label, pct, color) {
-    return `
-        <div style="flex:1; text-align:center;">
-            <div style="
-                height:8px; border-radius:4px;
-                background:${color}33; overflow:hidden; margin-bottom:8px;
-            ">
-                <div style="height:100%; width:${pct}%; background:${color}; border-radius:4px;"></div>
-            </div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:${color};">${pct}%</div>
-            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#6a8099; margin-top:2px;">${label}</div>
+        <div class="articles-header">
+            <div class="section-title" style="margin-top:0">Мои статьи и черновики</div>
+            <a class="btn-new-article" href="editor.html">+ Написать</a>
+        </div>
+        <div id="articles-section">
+            <div class="articles-loading"><span class="spinner" style="display:inline-block"></span></div>
         </div>
     `;
+
+    _renderHourBars(hourlyStats);
+
+    // Загружаем статьи асинхронно
+    _loadAndRenderArticles();
+}
+
+// ─── Статьи ──────────────────────────────────────────────────────────────────
+async function _loadAndRenderArticles() {
+    const container = document.getElementById('articles-section');
+    if (!container) return;
+
+    try {
+        const articles = await CogneeSupabase.getUserArticlesFull();
+        container.innerHTML = '';
+
+        if (!articles || articles.length === 0) {
+            container.innerHTML = `
+                <div class="articles-empty">
+                    <div class="articles-empty-icon">✍️</div>
+                    <div class="articles-empty-title">Статей пока нет</div>
+                    <div class="articles-empty-sub">Напиши свою первую статью — CogneeAI поможет создать адаптивную версию</div>
+                    <a class="btn-primary-sm" href="editor.html">Написать статью</a>
+                </div>`;
+            return;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'articles-list';
+
+        articles.forEach(article => {
+            const card = _buildArticleCard(article);
+            list.appendChild(card);
+        });
+
+        container.appendChild(list);
+    } catch(e) {
+        console.error('[Profile] Ошибка загрузки статей:', e);
+        container.innerHTML = `<div class="articles-loading" style="color:#EF5350">Ошибка загрузки статей: ${_esc(e.message)}</div>`;
+    }
+}
+
+function _buildArticleCard(article) {
+    const card = document.createElement('div');
+    card.className = 'article-card';
+    card.id = `article-card-${article.id}`;
+
+    const date = article.published_at
+        ? new Date(article.published_at).toLocaleDateString('ru-RU', {day:'numeric',month:'long',year:'numeric'})
+        : '';
+
+    // Бейджи
+    const draftBadge   = article.is_draft   ? '<span class="badge badge-draft">черновик</span>' : '';
+    const visBadge     = !article.is_draft && article.visibility === 'private'
+        ? '<span class="badge badge-private">🔒 приватная</span>'
+        : !article.is_draft
+            ? '<span class="badge badge-public">🌐 публичная</span>'
+            : '';
+
+    // Ссылка для чтения
+    let readHref;
+    if (article.is_draft) {
+        readHref = null; // черновик нельзя читать как статью
+    } else if (article.visibility === 'private' && article.slug) {
+        readHref = `reader.html?id=${article.slug}`;
+    } else {
+        readHref = `reader.html?id=${article.id}`;
+    }
+
+    const editHref = `editor.html?edit=${article.id}`;
+
+    const readBtn = readHref
+        ? `<a class="btn-action read" href="${readHref}" target="_blank">👁 Читать</a>`
+        : `<span class="btn-action" style="opacity:.4;cursor:not-allowed">👁 Черновик</span>`;
+
+    card.innerHTML = `
+        <div class="article-card-top">
+            <a class="article-card-title" href="${readHref || '#'}" ${readHref ? 'target="_blank"' : 'onclick="return false"'}>
+                ${_esc(article.title || 'Без названия')}
+            </a>
+            <div class="article-badges">${draftBadge}${visBadge}</div>
+        </div>
+        ${article.annotation
+            ? `<div class="article-card-annotation">${_esc(article.annotation)}</div>`
+            : ''}
+        <div class="article-card-meta">${date}</div>
+        <div class="article-card-actions">
+            ${readBtn}
+            <a class="btn-action edit" href="${editHref}">✏️ Редактировать</a>
+            <button class="btn-action delete" onclick="confirmDelete(${article.id}, '${_esc(article.title || 'статью')}')">🗑 Удалить</button>
+        </div>`;
+
+    return card;
+}
+
+// ─── Удаление ─────────────────────────────────────────────────────────────────
+let _pendingDeleteId = null;
+
+window.confirmDelete = function(id, title) {
+    _pendingDeleteId = id;
+    document.getElementById('confirm-sub').innerHTML =
+        `Статья <strong>"${_esc(title)}"</strong> будет удалена навсегда.<br>Это действие необратимо.`;
+    document.getElementById('confirm-overlay').classList.add('vis');
+
+    document.getElementById('btn-confirm-delete').onclick = async function() {
+        this.disabled = true;
+        this.textContent = 'Удаляем…';
+        try {
+            await CogneeSupabase.deleteArticle(_pendingDeleteId);
+            closeConfirm();
+            // Удаляем карточку из DOM
+            const card = document.getElementById(`article-card-${_pendingDeleteId}`);
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.3s';
+                setTimeout(() => card.remove(), 300);
+            }
+        } catch(e) {
+            this.textContent = 'Ошибка';
+            this.disabled = false;
+        }
+    };
+};
+
+window.closeConfirm = function() {
+    _pendingDeleteId = null;
+    document.getElementById('confirm-overlay').classList.remove('vis');
+};
+
+// ─── Вспомогательные ─────────────────────────────────────────────────────────
+function _zoneBar(label, pct, color) {
+    return `
+        <div style="flex:1;text-align:center">
+            <div style="height:8px;border-radius:4px;background:${color}33;overflow:hidden;margin-bottom:8px">
+                <div style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${color}">${pct}%</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#6a8099;margin-top:2px">${label}</div>
+        </div>`;
 }
 
 function _renderHourBars(hourlyStats) {
     const container = document.getElementById('hour-bars');
     if (!container) return;
-
     const maxVal = Math.max(...hourlyStats, 1);
-
-    // Показываем только каждые 3 часа лейблом, остальные — просто бары
     hourlyStats.forEach((val, h) => {
         const pct   = val > 0 ? Math.max(8, Math.round((val / maxVal) * 100)) : 4;
         const color = val > 70 ? '#4FC3F7' : val >= 40 ? '#81C784' : val > 0 ? '#FFB74D' : '#ffffff18';
-
-        const wrap = document.createElement('div');
+        const wrap  = document.createElement('div');
         wrap.className = 'hour-bar-wrap';
         wrap.innerHTML = `
-            <div class="hour-bar" style="height:${pct}%; background:${color};"></div>
-            <div class="hour-label">${h % 6 === 0 ? h : ''}</div>
-        `;
+            <div class="hour-bar" style="height:${pct}%;background:${color}"></div>
+            <div class="hour-label">${h % 6 === 0 ? h : ''}</div>`;
         container.appendChild(wrap);
     });
 }
 
-// ─── Синхронизация ────────────────────────────────────────────────────────
 async function handleSync() {
     const btn = document.getElementById('sync-btn');
-    btn.disabled  = true;
-    btn.textContent = '…';
-
+    btn.disabled = true; btn.textContent = '…';
     try {
         await CogneeSupabase.syncKIMHistory();
         btn.textContent = '✓ Готово';
-        setTimeout(() => {
-            btn.textContent = 'Синхронизировать';
-            btn.disabled = false;
-        }, 2000);
-    } catch (e) {
-        btn.textContent = 'Ошибка';
-        btn.disabled = false;
+        setTimeout(() => { btn.textContent = 'Синхронизировать'; btn.disabled = false; }, 2000);
+    } catch(e) {
+        btn.textContent = 'Ошибка'; btn.disabled = false;
     }
 }
 
-// ─── Выход ────────────────────────────────────────────────────────────────
 async function handleSignOut() {
     await CogneeSupabase.signOut();
     window.location.href = 'auth.html';
@@ -587,10 +628,8 @@ async function handleSignOut() {
 
 function _esc(s) {
     return String(s)
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;');
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 </body>
