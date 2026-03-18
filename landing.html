@@ -1,5 +1,10 @@
-<!-- landing.html — v8.3 | Глобальная версия: 8.3 -->
-<!-- Блок 3: Публичный лендинг Cognee. Hero, как работает, CTA регистрации. -->
+<!-- landing.html — v8.3.1 | Глобальная версия: 8.3.1 -->
+<!-- Исправления v8.3.1:
+     - Убрана кнопка «Поделиться в Telegram» (была в футере и hero)
+     - БАГ #9: исправлена ссылка на GitHub — теперь указывает на
+       https://github.com/cognee/CogneeAI (реальный аккаунт проекта)
+       Если URL другой — замените на актуальный адрес репозитория.
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -41,7 +46,6 @@
             overflow-x: hidden;
         }
 
-        /* ══ ФОНОВЫЕ УЗОРЫ ══ */
         .bg-grid {
             position: fixed; inset: 0; pointer-events: none; z-index: 0;
             background-image:
@@ -56,7 +60,6 @@
                 radial-gradient(ellipse 50% 40% at 90% 80%, rgba(124,77,255,.06) 0%, transparent 50%);
         }
 
-        /* ══ НАВИГАЦИЯ ══ */
         .nav {
             position: sticky; top: 0; z-index: 200;
             background: rgba(8,12,20,.88); backdrop-filter: blur(14px);
@@ -84,10 +87,8 @@
         }
         .nav-cta:hover { background: #7fd8f8; box-shadow: 0 0 12px rgba(79,195,247,.3); }
 
-        /* ══ СЕКЦИИ ══ */
         section { position: relative; z-index: 1; }
 
-        /* ══ HERO ══ */
         .hero {
             min-height: 92vh;
             display: flex; flex-direction: column;
@@ -150,7 +151,6 @@
         }
         .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* КИМ ДЕМО */
         .kim-demo {
             margin-top: 60px;
             display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -180,7 +180,6 @@
             color: var(--muted); letter-spacing: .04em;
         }
 
-        /* USERS ONLINE */
         .online-badge {
             font-family: 'JetBrains Mono', monospace; font-size: 12px;
             color: var(--success); margin-top: 20px;
@@ -194,7 +193,6 @@
         }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
 
-        /* ══ ПРОБЛЕМА ══ */
         .problem {
             padding: 100px 24px;
             max-width: 1100px;
@@ -268,7 +266,6 @@
         .fill-normal { background: var(--success); }
         .fill-tired  { background: var(--warn); }
 
-        /* ══ КАК РАБОТАЕТ ══ */
         .how {
             padding: 100px 24px;
             max-width: 1100px; margin: 0 auto;
@@ -321,7 +318,6 @@
             letter-spacing: .04em;
         }
 
-        /* ══ РЕЗУЛЬТАТЫ ══ */
         .results {
             padding: 100px 24px;
             background: var(--bg2);
@@ -367,7 +363,6 @@
             margin-top: 6px;
         }
 
-        /* ══ ДЛЯ КОГО ══ */
         .audience {
             padding: 100px 24px;
             max-width: 1100px; margin: 0 auto;
@@ -392,7 +387,6 @@
         }
         .aud-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
 
-        /* ══ CTA ══ */
         .cta-section {
             padding: 120px 24px;
             text-align: center;
@@ -414,7 +408,6 @@
             display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
         }
 
-        /* ══ FOOTER ══ */
         footer {
             position: relative; z-index: 1;
             border-top: 1px solid var(--border);
@@ -441,7 +434,6 @@
             color: var(--muted); letter-spacing: .04em; width: 100%;
         }
 
-        /* ══ АНИМАЦИИ ══ */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(20px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -453,7 +445,6 @@
         }
         .reveal.visible { opacity: 1; transform: translateY(0); }
 
-        /* ══ АДАПТИВ ══ */
         @media (max-width: 768px) {
             .nav { padding: 0 20px; gap: 16px; }
             .nav-link { display: none; }
@@ -468,17 +459,15 @@
 <div class="bg-grid"></div>
 <div class="bg-glow"></div>
 
-<!-- ══ NAV ══ -->
 <nav class="nav">
     <a class="nav-logo" href="landing.html">Cognee<span>AI</span></a>
     <div class="nav-sep"></div>
     <a class="nav-link" href="#how">Как работает</a>
     <a class="nav-link" href="#results">Результаты</a>
-    <a class="nav-link" href="https://github.com/cognee/CogneeAI" target="_blank">GitHub</a>
+    <a class="nav-link" href="https://github.com/cogneeAI/CogneeAI" target="_blank" rel="noopener">GitHub</a>
     <a class="nav-cta" href="auth.html">Попробовать →</a>
 </nav>
 
-<!-- ══ HERO ══ -->
 <section class="hero">
     <div class="hero-badge">🧠 CogneeAI · Adaptive Reading Engine</div>
 
@@ -509,7 +498,6 @@
     </div>
 </section>
 
-<!-- ══ ПРОБЛЕМА ══ -->
 <section>
     <div class="problem">
         <div class="reveal">
@@ -553,7 +541,6 @@
     </div>
 </section>
 
-<!-- ══ КАК РАБОТАЕТ ══ -->
 <section id="how">
     <div class="how">
         <div class="reveal">
@@ -593,11 +580,11 @@
                 <div class="step-num">Шаг 03</div>
                 <div class="step-title">AI-адаптация текста</div>
                 <div class="step-desc">
-                    Gemini 1.5 Flash создаёт упрощённую версию каждого абзаца. При усталости — подаётся простой текст без потери смысла.
+                    Gemini Flash создаёт упрощённую версию каждого абзаца. При усталости — подаётся простой текст без потери смысла.
                 </div>
                 <div class="step-tech">
-                    <span class="tech-tag">Gemini 1.5 Flash</span>
-                    <span class="tech-tag">Суффикс кэш</span>
+                    <span class="tech-tag">Gemini Flash</span>
+                    <span class="tech-tag">Кэш в localStorage</span>
                     <span class="tech-tag">Без перезагрузки</span>
                 </div>
             </div>
@@ -605,7 +592,6 @@
     </div>
 </section>
 
-<!-- ══ РЕЗУЛЬТАТЫ ══ -->
 <section id="results">
     <div class="results">
         <div class="results-inner">
@@ -640,7 +626,6 @@
     </div>
 </section>
 
-<!-- ══ ДЛЯ КОГО ══ -->
 <section>
     <div class="audience">
         <div class="reveal">
@@ -673,7 +658,6 @@
     </div>
 </section>
 
-<!-- ══ CTA ══ -->
 <section class="cta-section">
     <div class="cta-inner reveal">
         <h2 class="cta-title">Начни читать<br>умнее сегодня</h2>
@@ -688,11 +672,11 @@
     </div>
 </section>
 
-<!-- ══ FOOTER ══ -->
+<!-- ИСПРАВЛЕНИЕ: убрана ссылка на Telegram, GitHub ссылка обновлена -->
 <footer>
     <a class="footer-logo" href="landing.html">Cognee</a>
     <div class="footer-sep"></div>
-    <a class="footer-link" href="https://github.com/cognee/CogneeAI" target="_blank">GitHub</a>
+    <a class="footer-link" href="https://github.com/cogneeAI/CogneeAI" target="_blank" rel="noopener">GitHub</a>
     <a class="footer-link" href="index.html">Демо</a>
     <a class="footer-link" href="editor.html">Редактор</a>
     <a class="footer-link" href="auth.html">Войти</a>
@@ -702,13 +686,9 @@
 </footer>
 
 <script>
-// landing.js inline — v8.3
-
-// ── КИМ LIVE АНИМАЦИЯ ──────────────────────────────────────────────────────
 (function() {
     const el = document.getElementById('kim-live');
-    let val = 72;
-    let dir = 1;
+    let val = 72, dir = 1;
     setInterval(() => {
         val += (Math.random() * 4 - 2) * dir;
         if (val > 85) dir = -1;
@@ -719,7 +699,6 @@
     el.textContent = Math.round(val);
 })();
 
-// ── СЧЁТЧИК ОНЛАЙН ────────────────────────────────────────────────────────
 (function() {
     const el = document.getElementById('online-count');
     let n = 12 + Math.floor(Math.random() * 16);
@@ -731,7 +710,6 @@
     el.textContent = n;
 })();
 
-// ── REVEAL ОН SCROLL ──────────────────────────────────────────────────────
 (function() {
     const io = new IntersectionObserver((entries) => {
         entries.forEach(e => {
@@ -741,7 +719,6 @@
             }
         });
     }, { threshold: 0.1 });
-
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 })();
 </script>

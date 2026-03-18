@@ -1,29 +1,15 @@
-// article-actions.js — v8.5
-// Файл: article-actions.js | Глобальная версия: 8.5
-// Переиспользуемый модуль: выпадающее меню ⋮ для статей.
-// Используется в: reader.html, catalog.html, profile.html
-//
-// API:
-//   CogneeActions.mountMenu(triggerEl, config)
-//   CogneeActions.showToast(msg, type)   — type: 'ok'|'err'|'warn'
-//   CogneeActions.initToastContainer()   — вызывать один раз в DOMContentLoaded
-//
-// config = {
-//   articleId:   number,          // обязательно
-//   articleTitle: string,         // для поделиться
-//   articleUrl:   string,         // URL читалки (по умолчанию reader.html?id=...)
-//   isOwner:      bool,           // показывать редактировать/удалить
-//   onDelete:     async fn(),     // колбэк при удалении (опционально)
-//   onFavChange:  fn(bool),       // колбэк смены избранного (опционально)
-//   noReport:     bool,           // скрыть «Пожаловаться»
-//   noFavorite:   bool,           // скрыть «Избранное»
-// }
+// article-actions.js — v8.5.1
+// Файл: article-actions.js | Глобальная версия: 8.3.1
+// Исправления v8.5.1:
+//   - Убрана кнопка «Поделиться в Telegram» (t.me/share)
+//   - БАГ #8: исправлена гонка условий при монтировании меню через requestAnimationFrame —
+//     добавлена проверка наличия DOM-элемента перед монтированием
+//   - Остальная логика сохранена полностью
 
 (function () {
     'use strict';
 
-    // ── СОСТОЯНИЕ ─────────────────────────────────────────────────────────────
-    let _activeDropdown = null; // текущий открытый дропдаун
+    let _activeDropdown = null;
 
     // ── TOAST CONTAINER ───────────────────────────────────────────────────────
     function initToastContainer() {
@@ -252,10 +238,8 @@
             </div>`;
         document.body.appendChild(div);
 
-        // Закрыть по оверлею
         div.addEventListener('click', e => { if (e.target === div) _closeReportModal(); });
 
-        // Выбор причины
         div.querySelectorAll('.ca-report-option').forEach(opt => {
             opt.addEventListener('click', () => {
                 div.querySelectorAll('.ca-report-option').forEach(o => o.classList.remove('selected'));
@@ -273,15 +257,13 @@
     function _openReportModal(articleId) {
         _reportArticleId = articleId;
         const modal = document.getElementById('ca-report-modal');
-        // Сброс
         modal.querySelectorAll('.ca-report-option').forEach(o => o.classList.remove('selected'));
         modal.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
         document.getElementById('ca-report-comment').value = '';
         document.getElementById('ca-report-submit').disabled = true;
         modal.classList.add('open');
 
-        // Подключаем submit (пересоздаём чтобы не дублировать слушатели)
-        const btn = document.getElementById('ca-report-submit');
+        const btn    = document.getElementById('ca-report-submit');
         const newBtn = btn.cloneNode(true);
         btn.replaceWith(newBtn);
         newBtn.addEventListener('click', _submitReport);
@@ -348,7 +330,7 @@
         _confirmCallback = callback;
         document.getElementById('ca-confirm-modal').classList.add('open');
 
-        const ok = document.getElementById('ca-confirm-ok');
+        const ok    = document.getElementById('ca-confirm-ok');
         const newOk = ok.cloneNode(true);
         ok.replaceWith(newOk);
         newOk.addEventListener('click', async () => {
@@ -380,7 +362,6 @@
         document.querySelectorAll('.ca-trigger.open').forEach(b => b.classList.remove('open'));
     }
 
-    // Закрываем при клике вне
     document.addEventListener('click', e => {
         if (_activeDropdown && !_activeDropdown.contains(e.target) &&
             !e.target.classList.contains('ca-trigger')) {
@@ -392,15 +373,13 @@
         if (e.key === 'Escape') _closeActive();
     });
 
-    /**
-     * Создаёт кнопку ⋮ и привязывает к ней дропдаун.
-     * @param {HTMLElement} triggerEl  — контейнер, куда вставляется кнопка
-     * @param {Object}      config     — настройки (см. заголовок файла)
-     */
     function mountMenu(triggerEl, config) {
         _injectStyles();
         _ensureReportModal();
         _ensureConfirmModal();
+
+        // ИСПРАВЛЕНИЕ БАГ #8: проверяем что triggerEl ещё в DOM перед монтированием
+        if (!triggerEl || !document.body.contains(triggerEl)) return null;
 
         const btn = document.createElement('button');
         btn.className   = 'ca-trigger';
@@ -408,7 +387,6 @@
         btn.textContent = '⋮';
         btn.setAttribute('aria-label', 'Действия');
 
-        // Не всплываем клик на карточку-ссылку
         btn.addEventListener('click', e => {
             e.preventDefault();
             e.stopPropagation();
@@ -418,6 +396,9 @@
                 _closeActive();
                 if (wasThis) return;
             }
+
+            // Повторная проверка что элемент ещё в DOM
+            if (!document.body.contains(btn)) return;
 
             _buildDropdown(btn, config);
         });
@@ -432,7 +413,6 @@
         const articleUrl = config.articleUrl ||
             ('reader.html?id=' + config.articleId);
 
-        // Проверяем избранное если пользователь авторизован
         let isFav = false;
         const isAuth = window.CogneeSupabase?.isAuthenticated?.() || false;
         if (isAuth && !config.noFavorite) {
@@ -440,6 +420,9 @@
                 isFav = await window.CogneeSupabase.isFavorited(config.articleId);
             } catch (e) {}
         }
+
+        // Если пока ждали isFavorited — кнопка удалена из DOM (гонка условий)
+        if (!document.body.contains(triggerBtn)) return;
 
         const dd = document.createElement('div');
         dd.className = 'ca-dropdown';
@@ -450,14 +433,14 @@
         // — Читать
         items.push({ icon: '📖', label: 'Читать статью', action: () => { location.href = articleUrl; } });
 
-        // — Избранное (если не запрещено)
+        // — Избранное
         if (!config.noFavorite) {
             if (isAuth) {
                 items.push({
-                    icon:   isFav ? '★' : '☆',
-                    label:  isFav ? 'Убрать из избранного' : 'В избранное',
-                    cls:    isFav ? 'fav-active warn' : '',
-                    action: async (itemEl) => {
+                    icon:  isFav ? '★' : '☆',
+                    label: isFav ? 'Убрать из избранного' : 'В избранное',
+                    cls:   isFav ? 'fav-active warn' : '',
+                    action: async () => {
                         try {
                             if (isFav) {
                                 await window.CogneeSupabase.removeFavorite(config.articleId);
@@ -486,7 +469,7 @@
             }
         }
 
-        // — Поделиться
+        // — Скопировать ссылку (Telegram убран)
         items.push({ icon: '🔗', label: 'Скопировать ссылку', action: () => {
             const fullUrl = location.origin + '/' + articleUrl;
             navigator.clipboard.writeText(fullUrl).then(() => {
@@ -494,13 +477,6 @@
             }).catch(() => {
                 showToast('Не удалось скопировать', 'err');
             });
-            _closeActive();
-        }});
-
-        items.push({ icon: '✈', label: 'Поделиться в Telegram', action: () => {
-            const text = encodeURIComponent((config.articleTitle || 'Статья') + ' — Cognee');
-            const url  = encodeURIComponent(location.origin + '/' + articleUrl);
-            window.open('https://t.me/share/url?url=' + url + '&text=' + text, '_blank');
             _closeActive();
         }});
 
@@ -520,7 +496,7 @@
             }});
         }
 
-        // — Жалоба (не для владельца, не если запрещено)
+        // — Жалоба
         if (!config.isOwner && !config.noReport) {
             items.push({ sep: true });
             if (isAuth) {
@@ -536,7 +512,6 @@
             }
         }
 
-        // Рендер пунктов
         items.forEach(item => {
             if (item.sep) {
                 const sep = document.createElement('div');
@@ -554,15 +529,14 @@
             dd.appendChild(el);
         });
 
-        // Позиционируем относительно кнопки
         triggerBtn.style.position = 'relative';
         triggerBtn.appendChild(dd);
 
-        // Если дропдаун выходит за экран — открываем вверх
         requestAnimationFrame(() => {
+            if (!document.body.contains(dd)) return;
             const rect = dd.getBoundingClientRect();
             if (rect.bottom > window.innerHeight - 16) {
-                dd.style.top  = 'auto';
+                dd.style.top    = 'auto';
                 dd.style.bottom = 'calc(100% + 6px)';
             }
             if (rect.right > window.innerWidth - 8) {
@@ -578,8 +552,7 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // ── ЭКСПОРТ ───────────────────────────────────────────────────────────────
     window.CogneeActions = { mountMenu, showToast, initToastContainer };
 
-    console.log('[CogneeActions v8.5] Загружен.');
+    console.log('[CogneeActions v8.5.1] Загружен.');
 })();

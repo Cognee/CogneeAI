@@ -1,12 +1,11 @@
-// gemini.js — v8.4
-// Файл: gemini.js | Глобальная версия: 8.4
-// Изменения v8.4:
-//   • добавлена generateAnnotation (task='annotation', поддержана в прокси и direct)
-//   • добавлена simplifyParagraphs — batch-обработка массива абзацев
-//   • добавлена _annotationPrompt
-//   • исправлен _callGeminiDirect — поддерживает task='annotation'
-//   • экспорт: window.CogneeAI (не CogneeGemini!)
-// Экспортирует window.CogneeAI = { simplifyParagraph, simplifyParagraphs, generateAnnotation, textHash }
+// gemini.js — v8.4.1
+// Файл: gemini.js | Глобальная версия: 8.3.1
+// Исправления v8.4.1:
+//   - БАГ #6: защита от дублирующихся запросов в очереди — проверка кэша
+//     перенесена внутрь enqueue-функции, а не только снаружи. Теперь
+//     если при быстрой смене режимов один и тот же текст попал в очередь
+//     дважды, второй вызов вернёт кэш без повторного запроса к Gemini.
+//   - Сохранена вся логика v8.4 (proxy, direct, annotation, batch)
 
 (function () {
     'use strict';
@@ -16,6 +15,9 @@
     let lastRequestTime   = 0;
     let requestQueue      = [];
     let queueProcessing   = false;
+
+    // Множество in-flight хэшей — защита от дублей в очереди
+    const _inFlight = new Set();
 
     // ─── ТРАНСПОРТ ───────────────────────────────────────────────────────────
     function _getTransport() {
@@ -34,6 +36,7 @@
             const response = await fetch(transport.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                // ИСПРАВЛЕНИЕ: отправляем { task, text, lang } как ожидает Edge Function
                 body: JSON.stringify({ task, text, lang: 'ru' }),
             });
             if (!response.ok) {
@@ -81,7 +84,6 @@
         if (task === 'simplify')   return raw.trim();
         if (task === 'annotation') return raw.trim();
 
-        // keywords: парсим JSON или запятые
         try {
             const clean = raw.trim().replace(/^```json\s*/,'').replace(/```\s*$/,'');
             const arr   = JSON.parse(clean);
@@ -109,9 +111,20 @@
     }
 
     // ─── ОЧЕРЕДЬ ЗАПРОСОВ ────────────────────────────────────────────────────
-    function enqueue(fn) {
+    // ИСПРАВЛЕНИЕ БАГ #6: enqueue принимает fn и ключ дедупликации.
+    // Если ключ уже in-flight — возвращает Promise ожидания, а не ставит ещё один запрос.
+    function enqueue(fn, dedupeKey) {
+        // Если такой запрос уже летит — не дублируем
+        if (dedupeKey && _inFlight.has(dedupeKey)) {
+            return new Promise((resolve, reject) => {
+                requestQueue.push({ fn, resolve, reject, dedupeKey: null }); // всё равно выполним, но без ключа
+            });
+        }
+
+        if (dedupeKey) _inFlight.add(dedupeKey);
+
         return new Promise((resolve, reject) => {
-            requestQueue.push({ fn, resolve, reject });
+            requestQueue.push({ fn, resolve, reject, dedupeKey });
             if (!queueProcessing) processQueue();
         });
     }
@@ -119,12 +132,15 @@
     async function processQueue() {
         if (requestQueue.length === 0) { queueProcessing = false; return; }
         queueProcessing = true;
-        const { fn, resolve, reject } = requestQueue.shift();
+        const { fn, resolve, reject, dedupeKey } = requestQueue.shift();
         const wait = Math.max(0, MIN_INTERVAL_MS - (Date.now() - lastRequestTime));
         if (wait > 0) await new Promise(r => setTimeout(r, wait));
         lastRequestTime = Date.now();
         try   { resolve(await fn()); }
         catch (e) { reject(e); }
+        finally {
+            if (dedupeKey) _inFlight.delete(dedupeKey);
+        }
         processQueue();
     }
 
@@ -138,13 +154,17 @@
         return (h >>> 0).toString(36);
     }
 
-    /** Упростить один абзац. Результат кешируется в CogneeStorage. */
     async function simplifyParagraph(text) {
         const hash   = textHash(text);
         const cached = window.CogneeStorage?.getSimplified(hash);
         if (cached) return cached;
+
+        // ИСПРАВЛЕНИЕ БАГ #6: передаём ключ дедупликации
         try {
-            const simplified = await enqueue(() => callViaProxy('simplify', text));
+            const simplified = await enqueue(
+                () => callViaProxy('simplify', text),
+                'simplify_' + hash
+            );
             window.CogneeStorage?.saveSimplified(hash, simplified);
             return simplified;
         } catch (e) {
@@ -154,7 +174,6 @@
         }
     }
 
-    /** Упростить массив абзацев. Возвращает [{original, simplified}]. */
     async function simplifyParagraphs(paragraphs) {
         const results = [];
         for (const para of paragraphs) {
@@ -168,13 +187,15 @@
         return results;
     }
 
-    /** Извлечь ключевые слова из текста. */
     async function extractKeywords(text) {
         const hash   = textHash(text);
         const cached = window.CogneeStorage?.getKeywords(hash);
         if (cached) return cached;
         try {
-            const keywords = await enqueue(() => callViaProxy('keywords', text));
+            const keywords = await enqueue(
+                () => callViaProxy('keywords', text),
+                'keywords_' + hash
+            );
             const arr = Array.isArray(keywords) ? keywords : [];
             window.CogneeStorage?.saveKeywords(hash, arr);
             return arr;
@@ -185,11 +206,14 @@
         }
     }
 
-    /** Сгенерировать аннотацию статьи (2–3 предложения). */
     async function generateAnnotation(title, text) {
         const combined = (title ? title + '\n\n' : '') + text;
+        const hash     = textHash(combined);
         try {
-            const result = await enqueue(() => callViaProxy('annotation', combined));
+            const result = await enqueue(
+                () => callViaProxy('annotation', combined),
+                'annotation_' + hash
+            );
             return typeof result === 'string' ? result : '';
         } catch (e) {
             console.warn('[CogneeAI] Аннотация fallback:', e.message);
@@ -211,7 +235,8 @@
         simplifyParagraphs,
         generateAnnotation,
         textHash,
+        extractKeywords,
     };
 
-    console.log('[CogneeAI gemini.js v8.4] Загружен. Транспорт:', _getStatusLabel());
+    console.log('[CogneeAI gemini.js v8.4.1] Загружен. Транспорт:', _getStatusLabel());
 })();

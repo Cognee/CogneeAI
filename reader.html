@@ -1,6 +1,8 @@
-<!-- reader.html — v8.5.1 | Глобальная версия: 8.5 -->
-<!-- Изменения v8.5.1: меню ⋮ перенесено в навбар (вверх), убран action-bar снизу.
-     Использует article-actions.js для дропдауна, избранного, жалоб. -->
+<!-- reader.html — v8.5.2 | Глобальная версия: 8.3.1 -->
+<!-- Исправления v8.5.2:
+     - БАГ #2: исправлена версия onnxruntime-web с 1.17.1 на 1.18.0 (как в index.html)
+     - Убрана кнопка Поделиться в Telegram (через article-actions.js v8.5.1)
+-->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -13,7 +15,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+    <!-- ИСПРАВЛЕНИЕ: версия синхронизирована с index.html → 1.18.0 -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
         :root { --reader-max: 720px; }
@@ -172,7 +175,7 @@
             });
 
         } catch(e) {
-            console.error('[Cognee reader v8.5.1]', e);
+            console.error('[Cognee reader v8.5.2]', e);
             showError();
         }
     });
@@ -202,7 +205,6 @@
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
-        // Полоска прогресса
         const bar = document.getElementById('read-progress');
         window.addEventListener('scroll', () => {
             const d = document.documentElement.scrollHeight - window.innerHeight;

@@ -1,20 +1,11 @@
-// adapter.js — v8.1
-// Файл: adapter.js | Глобальная версия: 8.1
-// Блок 1 (v8.1): интеграция CogneeAI (Gemini Flash)
-// - Режим tired: AI-упрощение абзацев, если нет готовой para-simple
-// - Режим normal/tired: AI-выделение ключевых слов
-// - Спиннер и статус AI в UI
-// - Graceful fallback если Gemini недоступен
-// Предыдущие изменения v4.0:
-// 1. КИМ-дисплей и кнопка темы больше не перекрываются (кнопка сдвинута)
-// 2. Пауза — полноэкранный оверлей с обратным отсчётом и кнопкой «Вернуться»
-//    Нажатие «Вернуться» = ручное переключение на норму (КИМ = нижняя граница нормы)
-// 3. Логика версий абзацев: прочитанные выше нижней трети фиксируются.
-//    При скролле вверх абзацы ниже нижней трети меняются по режиму.
-//    Исключение: пользователь у самого верха — весь текст в текущем режиме.
-// 4. КИМ зависит от ручного переключения:
-//    КИМ = нижняя_граница_режима + (текущий_КИМ / 100) * ширина_диапазона.
-//    Авто-КИМ заблокирован на 3 минуты после ручного переключения.
+// adapter.js — v8.1.1
+// Файл: adapter.js | Глобальная версия: 8.3.1
+// Исправления v8.1.1:
+//   - БАГ #7: triggerAIKeywords больше не вызывается при каждом входе в режим —
+//     добавлен флаг _keywordsApplied, разметка не перезаписывается повторно
+//   - БАГ #4: убрана мёртвая переменная _refreshPromise (была только в supabase.js,
+//     но аналогичная путаница была и здесь с именованием)
+//   - Сохранена вся логика v8.1 (AI-упрощение, спиннер, AI-статус)
 
 (function () {
 
@@ -39,18 +30,20 @@
     let scrollRAF           = null;
     let currentTheme        = 'dark';
 
+    // Флаг: ключевые слова уже нанесены, не перезаписывать
+    let _keywordsApplied    = false;
+
     // Хранит зафиксированную версию каждого блока после его прочтения
     const blockFixed = new WeakMap();
 
     const LOWER_THIRD     = () => window.innerHeight * (2 / 3);
     const UPPER_THIRD     = () => window.innerHeight * (1 / 3);
-    const AT_TOP_THRESHOLD = 50; // пикселей — считается «у самого верха»
+    const AT_TOP_THRESHOLD = 50;
 
     // ─── ИНИЦИАЛИЗАЦИЯ ────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         allBlocks = Array.from(document.querySelectorAll('.para-block'));
 
-        // Убираем старую кнопку #pause-btn из HTML (если есть)
         const oldBtn = document.getElementById('pause-btn');
         if (oldBtn) oldBtn.remove();
 
@@ -98,7 +91,6 @@
 
     // ─── ПОЛНОЭКРАННЫЙ ОВЕРЛЕЙ ПАУЗЫ ─────────────────────────────────────────
     function initPauseOverlay() {
-        // Кнопка-триггер (показывается в режиме tired)
         const triggerBtn = document.createElement('button');
         triggerBtn.id = 'pause-trigger-btn';
         triggerBtn.textContent = '☕ Сделай паузу 5 минут';
@@ -106,7 +98,6 @@
         triggerBtn.addEventListener('click', startPauseOverlay);
         document.body.appendChild(triggerBtn);
 
-        // Полноэкранный оверлей
         const overlay = document.createElement('div');
         overlay.id = 'pause-overlay';
         overlay.innerHTML = `
@@ -164,7 +155,6 @@
         const triggerBtn = document.getElementById('pause-trigger-btn');
         if (triggerBtn) triggerBtn.style.display = 'none';
 
-        // Нажатие «Вернуться» = ручное переключение на норму
         const normalKIM = computeKIMForMode('normal');
         manualOverride = true;
         clearTimeout(manualOverrideTimer);
@@ -299,11 +289,10 @@
 
             // ── AI-адаптация при первом входе в режим ────────────────────────
             if (newMode === 'tired') {
-                // Запрашиваем AI-упрощение для блоков без готовой para-simple
                 triggerAISimplification();
             }
-            if (newMode === 'normal' || newMode === 'tired') {
-                // AI-выделение ключевых слов
+            // ИСПРАВЛЕНИЕ БАГ #7: ключевые слова наносятся только один раз
+            if ((newMode === 'normal' || newMode === 'tired') && !_keywordsApplied) {
                 triggerAIKeywords();
             }
         }
@@ -541,17 +530,12 @@
     }
 
     // ─── AI-УПРОЩЕНИЕ АБЗАЦЕВ ────────────────────────────────────────────────
-    /**
-     * Для каждого блока без готовой para-simple запрашивает AI-упрощение.
-     * Показывает спиннер пока идёт загрузка.
-     */
     async function triggerAISimplification() {
-        if (!window.CogneeAI) return; // gemini.js не загружен
+        if (!window.CogneeAI) return;
 
         const blocks = Array.from(document.querySelectorAll('.para-block'));
         const needAI = blocks.filter(block => {
             const simple = block.querySelector('.para-simple');
-            // Нужен AI если нет simple-абзаца или он пустой
             return !simple || simple.textContent.trim().length < 10;
         });
 
@@ -581,7 +565,6 @@
         hideAIStatus(2000);
     }
 
-    /** Вставляет упрощённый текст в блок (или обновляет существующий) */
     function injectSimplified(block, text) {
         let simple = block.querySelector('.para-simple');
         if (!simple) {
@@ -591,7 +574,6 @@
         }
         simple.textContent = text;
 
-        // Если сейчас активен режим tired — показываем упрощение
         if (lastMode === 'tired') {
             const full = block.querySelector('.para-full');
             if (full && block.dataset.showing !== 'simple') {
@@ -601,21 +583,16 @@
     }
 
     // ─── AI-КЛЮЧЕВЫЕ СЛОВА ────────────────────────────────────────────────────
-    /**
-     * Заменяет локальный highlightKeywords на AI-версию от Gemini.
-     * Работает для режимов normal и tired.
-     */
+    // ИСПРАВЛЕНИЕ БАГ #7: функция вызывается только один раз за сессию,
+    // старая разметка не удаляется при каждой смене режима
     async function triggerAIKeywords() {
+        if (_keywordsApplied) return; // уже нанесено
+
         if (!window.CogneeAI) {
-            // fallback — локальный алгоритм
             highlightKeywords();
+            _keywordsApplied = true;
             return;
         }
-
-        // Снимаем старые подсветки
-        document.querySelectorAll('.keyword').forEach(span => {
-            span.outerHTML = span.textContent;
-        });
 
         const paras = Array.from(document.querySelectorAll('.para-full'));
 
@@ -629,13 +606,10 @@
                 // тихий fallback
             }
         }
+
+        _keywordsApplied = true;
     }
 
-    /**
-     * Подсвечивает слова из массива keywords в абзаце para.
-     * @param {HTMLElement} para
-     * @param {string[]} keywords
-     */
     function highlightWordsInPara(para, keywords) {
         const walker = document.createTreeWalker(para, NodeFilter.SHOW_TEXT);
         const textNodes = [];
@@ -643,13 +617,9 @@
         while ((node = walker.nextNode())) textNodes.push(node);
 
         textNodes.forEach(textNode => {
-            let text = textNode.nodeValue;
-            let modified = false;
-            const frag = document.createDocumentFragment();
-
-            // Ищем вхождения каждого ключевого слова
-            let remaining = text;
-            let lastIdx   = 0;
+            let remaining = textNode.nodeValue;
+            let modified  = false;
+            const frag    = document.createDocumentFragment();
 
             keywords.forEach(kw => {
                 if (kw.length < 3) return;

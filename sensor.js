@@ -1,14 +1,9 @@
-// sensor.js — v8.3
-// Файл: sensor.js | Глобальная версия: 8.3
-// Изменения v8.0 (16 признаков + ONNX инференс):
-//   - Вектор признаков расширен с 8 до 16
-//   - Новые сенсоры: dwell_without_progress, micro_scroll_corrections,
-//     paragraph_reread_rate, scroll_direction_changes, reading_speed_variance,
-//     interaction_gap, touch_input, viewport_lock_duration
-//   - Инференс переведён с weights.js на ONNX Runtime Web
-//   - weights.js больше не нужен — удали из репозитория и index.html
-//   - Модель загружается из model/cognee_ai.onnx
-//   - Исправлен баг: "завис на абзаце" теперь не считается flow
+// sensor.js — v8.3.1
+// Файл: sensor.js | Глобальная версия: 8.3.1
+// Исправления v8.3.1:
+//   - БАГ #1: добавлен прямой вызов window.applyAdaptation(smoothedKIM) после dispatchEvent
+//     Ранее sensor.js только диспатчил 'cognee:kim', но adapter.js его не слушал —
+//     адаптация не срабатывала автоматически.
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -39,34 +34,25 @@
 
     // ─── НОВЫЕ СЕНСОРЫ (признаки 8–15) ───────────────────────────────────────
 
-    // f8: dwell_without_progress
     let dwellWithoutProgressMs = 0;
     let lastForwardScrollTime  = Date.now();
 
-    // f9: micro_scroll_corrections
     let microScrollCount     = 0;
     let lastMicroScrollReset = Date.now();
 
-    // f10: paragraph_reread_rate
     const paragraphVisits    = new Map();
     let paragraphRereadsTotal = 0;
     let paragraphsTracked    = 0;
 
-    // f11: scroll_direction_changes
     let directionChangeCount  = 0;
     let lastScrollDirection   = 'none';
     let directionWindowReset  = Date.now();
 
-    // f12: reading_speed_variance
     const speedSamples = [];
-
-    // f13: interaction_gap
     const interactionTimes = [];
 
-    // f14: touch_input
     let isTouchDevice = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) ? 1.0 : 0.0;
 
-    // f15: viewport_lock_duration
     let viewportLockSec   = 0;
     let viewportLockStart = Date.now();
     let lastViewportY     = window.scrollY;
@@ -287,7 +273,6 @@
             const url = new URL(MODEL_PATH, window.location.href).href;
             console.log('[CogneeAI] Загружаю ONNX:', url);
 
-            // numThreads: 1 — GitHub Pages не поддерживает crossOriginIsolated
             ort.env.wasm.numThreads = 1;
             onnxSession = await ort.InferenceSession.create(url, {
                 executionProviders: ['wasm'],
@@ -296,7 +281,6 @@
 
             console.log('[CogneeAI] Входы:', onnxSession.inputNames, '| Выходы:', onnxSession.outputNames);
 
-            // Прогрев
             const dummy = new ort.Tensor('float32', new Float32Array(FEATURE_SIZE), [1, 1, FEATURE_SIZE]);
             await onnxSession.run({ [onnxSession.inputNames[0]]: dummy });
 
@@ -513,12 +497,24 @@
             }
         }
 
-        // Диспатч события для adapter.js
-        if (Math.abs(smoothedKIM - prevKIM) >= KIM_CHANGE_THRESHOLD || lastKIM === null) {
+        // ─── ИСПРАВЛЕНИЕ БАГ #1 ───────────────────────────────────────────────
+        // Прямой вызов adapter.js при значимом изменении КИМ.
+        // Ранее sensor.js только диспатчил событие, но adapter.js его не слушал.
+        const hasSignificantChange = Math.abs(smoothedKIM - (lastKIM ?? 70)) >= KIM_CHANGE_THRESHOLD;
+        const isFirstTick          = lastKIM === null;
+
+        if (hasSignificantChange || isFirstTick) {
             lastKIM = smoothedKIM;
+
+            // Диспатч события для внешних слушателей
             window.dispatchEvent(new CustomEvent('cognee:kim', {
                 detail: { kim: smoothedKIM, zone, features: buildFeatureVector() }
             }));
+
+            // Прямой вызов adapter.js (основной путь адаптации)
+            if (typeof window.applyAdaptation === 'function') {
+                window.applyAdaptation(smoothedKIM);
+            }
         }
 
         // Analytics hook
