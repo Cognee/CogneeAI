@@ -1,9 +1,10 @@
 
 /* ═══════════════════════════════════════════════════════════
-   Cognee — styles.css v8.3.1
-   Файл: styles.css | Глобальная версия: 8.3.1
-   Изменения v8.1:
-   - Добавлены стили AI-элементов (Блок 1): статус-строка, спиннер, keyword-ai
+   Cognee — styles.css v9.0
+   Файл: styles.css | Глобальная версия: 9.0
+   Изменения v9.0 (Блок 1):
+   - Задача 1.1: добавлена анимация @keyframes kim-pulse для #kim-display
+   - Задача 1.2: добавлен полный блок @media (max-width: 600px) — мобильная адаптация
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── CSS-ПЕРЕМЕННЫЕ: ТЁМНАЯ ТЕМА (по умолчанию) ─────────────────────────── */
@@ -142,7 +143,6 @@ body.mode-tired {
     color: var(--text-tired);
 }
 
-/* Тёмная тема tired: тёплый янтарно-сепийный фон */
 body.mode-tired {
     background-color: #13110e;
 }
@@ -184,7 +184,6 @@ body.mode-tired h2 {
 }
 
 /* ─── КНОПКА-ТРИГГЕР ПАУЗЫ ───────────────────────────────────────────────── */
-/* display управляется ТОЛЬКО через adapter.js */
 #pause-trigger-btn {
     position: fixed;
     bottom: 30px;
@@ -363,6 +362,17 @@ body.mode-tired h2 {
     transition: border-color 1s ease, background-color 1.2s ease, color 1.2s ease;
 }
 
+/* ─── КИМ ПУЛЬС ПРИ СМЕНЕ ЗОНЫ (задача 1.1) ─────────────────────────────── */
+@keyframes kim-pulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+}
+
+/* Применяется через JS при смене зоны */
+#kim-display.kim-pulse-anim {
+    animation: kim-pulse 0.6s ease;
+}
+
 /* ─── КНОПКА ТЕМЫ ────────────────────────────────────────────────────────── */
 #cognee-theme-toggle:hover {
     background: rgba(255,255,255,0.1) !important;
@@ -382,8 +392,7 @@ body.mode-tired h2 {
     box-shadow: 0 2px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
 }
 
-/* ─── ССЫЛКА НА ДАШБОРД (v5.0) ───────────────────────────────────────────── */
-/* Иконка 📊 в правом верхнем углу, под КИМ-дисплеем                         */
+/* ─── ССЫЛКА НА ДАШБОРД ──────────────────────────────────────────────────── */
 #dash-link {
     position: fixed;
     top: 60px;
@@ -413,8 +422,7 @@ body.mode-tired h2 {
     box-shadow: 0 2px 16px rgba(0,0,0,0.12);
 }
 
-/* ─── ССЫЛКА НА ПРОФИЛЬ (v8.2) ───────────────────────────────────────────── */
-/* Иконка 👤 под дашбордом                                                     */
+/* ─── ССЫЛКА НА ПРОФИЛЬ ──────────────────────────────────────────────────── */
 #profile-link {
     position: fixed;
     top: 104px;
@@ -444,8 +452,7 @@ body.mode-tired h2 {
     box-shadow: 0 2px 16px rgba(0,0,0,0.12);
 }
 
-/* ─── ССЫЛКА НА ЛЕНДИНГ (v8.3) ───────────────────────────────────────────── */
-/* Иконка 🌐 под профилем                                                      */
+/* ─── ССЫЛКА НА ЛЕНДИНГ ──────────────────────────────────────────────────── */
 #landing-link {
     position: fixed;
     top: 148px;
@@ -476,10 +483,9 @@ body.mode-tired h2 {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   AI-ЭЛЕМЕНТЫ — Блок 1 v8.1 (CogneeAI / Gemini Flash)
+   AI-ЭЛЕМЕНТЫ — v8.1
    ═══════════════════════════════════════════════════════════ */
 
-/* ─── AI-статус (строка внизу экрана) ──────────────────────── */
 #cognee-ai-status {
     position: fixed;
     bottom: 24px;
@@ -513,7 +519,6 @@ body.mode-tired h2 {
     color: #1a7ab5;
 }
 
-/* ─── AI-спиннер (три точки в блоке абзаца) ──────────────── */
 .cognee-ai-spinner {
     display: flex;
     gap: 5px;
@@ -544,7 +549,6 @@ body.mode-tired h2 {
     background: #1a7ab5;
 }
 
-/* ─── AI-ключевые слова (улучшенная подсветка) ───────────── */
 .keyword-ai {
     background: rgba(79, 195, 247, 0.14);
     color: #7dd3f7;
@@ -562,4 +566,122 @@ body.mode-tired h2 {
     background: rgba(26, 122, 181, 0.1);
     color: #1a5f8b;
     border-bottom-color: rgba(26, 122, 181, 0.35);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   МОБИЛЬНАЯ АДАПТАЦИЯ — v9.0 (Блок 1, Задача 1.2)
+   Целевой диапазон: ширина < 600px
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+
+    /* ── КИМ-дисплей: компактный, не перекрывает текст ── */
+    #kim-display {
+        font-size: 11px;
+        padding: 5px 9px;
+        top: 8px;
+        right: 8px;
+        max-width: calc(100vw - 16px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ── Иконки дашборда, профиля, лендинга: меньше и ближе к краю ── */
+    #dash-link {
+        top: 46px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+
+    #profile-link {
+        top: 82px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+
+    #landing-link {
+        top: 118px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+
+    /* ── Переключатель режимов: горизонтально снизу, не перекрывает текст ── */
+    #cognee-mode-switcher {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+        bottom: 10px !important;
+        left: 8px !important;
+        right: 8px !important;
+        justify-content: center !important;
+    }
+
+    #cognee-mode-switcher button {
+        font-size: 10px !important;
+        padding: 4px 10px !important;
+    }
+
+    /* ── Статья: уменьшить боковые отступы ── */
+    .article {
+        padding: 0 14px;
+        margin: 32px auto;
+    }
+
+    /* ── Отступ снизу: место для режим-switcher ── */
+    body {
+        padding-bottom: 80px;
+    }
+
+    /* ── Кнопка паузы: touch-зона по стандарту Apple HIG (44px) ── */
+    #pause-trigger-btn {
+        min-height: 44px;
+        min-width: 200px;
+        font-size: 14px;
+        padding: 10px 24px;
+    }
+
+    /* ── Кнопка темы: меньше и правее ── */
+    #cognee-theme-toggle {
+        top: 8px !important;
+        right: calc(8px + 90px) !important; /* правее kim-display */
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 14px !important;
+    }
+
+    /* ── Прогресс-бар: чуть толще на мобиле ── */
+    #cognee-progress-bar {
+        width: 4px !important;
+    }
+}
+
+/* ── reader.html мобильная адаптация ── */
+@media (max-width: 600px) {
+    .reader-nav {
+        padding: 0 12px !important;
+    }
+
+    /* Скрываем текстовые ссылки в nav читалки — оставляем только кнопку действий */
+    .reader-nav-link {
+        display: none !important;
+    }
+
+    .article-title {
+        font-size: clamp(18px, 5vw, 28px) !important;
+    }
+
+    .meta-row {
+        gap: 8px !important;
+    }
+
+    /* Читалка: убираем ограничение ширины */
+    :root {
+        --reader-max: 100% !important;
+    }
 }

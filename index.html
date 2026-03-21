@@ -1,9 +1,10 @@
-<!-- index.html — v8.3.1.1 | Глобальная версия: 8.2 -->
-<!-- Изменения v8.2:
-     - Добавлена ссылка на profile.html (иконка 👤 рядом с дашбордом)
-     - Добавлен supabase.js в порядок скриптов (между storage.js и gemini.js)
-     - Favicon переведён на relative paths (исправление GitHub Pages)
-     - Комментарий обновлён: описание прокси
+<!-- index.html — v9.0 | Глобальная версия: 9.0 -->
+<!--
+  Изменения v9.0 (Блок 1, Задача 1.5):
+  - Добавлен онбординг-оверлей (3 шага) при первом открытии
+  - Проверяет localStorage["cognee_onboarded"]; показывает один раз
+  - Крестик [×] для пропуска; кнопки "Далее →" / "Понял, читаю"
+  - Все остальные изменения из v8.3.1.1 сохранены
 -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -13,33 +14,226 @@
     <meta name="description" content="Cognee — адаптивная подача контента по поведению пользователя. Нейросеть CogneeAI прямо в браузере.">
     <title>Cognee — демо</title>
 
-    <!-- Favicon (relative paths для GitHub Pages subdirectory) -->
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
     <link rel="shortcut icon" href="favicon/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png" />
     <link rel="manifest" href="favicon/site.webmanifest" />
 
-    <!-- Шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="styles.css">
+
+    <!-- Стили онбординга (встроены для скорости) -->
+    <style>
+        /* ── ОНБОРДИНГ ОВЕРЛЕЙ (задача 1.5) ── */
+        #cognee-onboarding {
+            position: fixed;
+            inset: 0;
+            z-index: 15000;
+            background: rgba(0, 0, 0, 0.78);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: ob-fade-in 0.35s ease;
+        }
+
+        @keyframes ob-fade-in {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+
+        #cognee-onboarding.ob-hiding {
+            animation: ob-fade-out 0.3s ease forwards;
+        }
+
+        @keyframes ob-fade-out {
+            from { opacity: 1; }
+            to   { opacity: 0; }
+        }
+
+        .ob-card {
+            background: #0d1520;
+            border: 1px solid rgba(79, 195, 247, 0.25);
+            border-radius: 16px;
+            padding: 32px 36px 28px;
+            max-width: 440px;
+            width: 100%;
+            position: relative;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 80px rgba(79,195,247,0.06);
+            animation: ob-slide-up 0.35s ease;
+        }
+
+        @keyframes ob-slide-up {
+            from { transform: translateY(16px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+        }
+
+        [data-theme="light"] .ob-card {
+            background: #f5f0e8;
+            border-color: rgba(26, 122, 181, 0.25);
+        }
+
+        /* Крестик для пропуска */
+        .ob-close {
+            position: absolute;
+            top: 14px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: #5a7090;
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+        .ob-close:hover { color: #a0b8d0; }
+
+        /* Индикатор шагов */
+        .ob-steps {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 24px;
+        }
+
+        .ob-step-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: rgba(79, 195, 247, 0.2);
+            transition: background 0.3s;
+        }
+
+        .ob-step-dot.active {
+            background: #4FC3F7;
+            box-shadow: 0 0 8px rgba(79, 195, 247, 0.5);
+        }
+
+        .ob-step-dot.done {
+            background: rgba(79, 195, 247, 0.5);
+        }
+
+        /* Иконка шага */
+        .ob-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+            display: block;
+            line-height: 1;
+        }
+
+        /* Заголовок */
+        .ob-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 600;
+            color: #4FC3F7;
+            letter-spacing: 0.04em;
+            margin-bottom: 10px;
+        }
+
+        [data-theme="light"] .ob-title {
+            color: #1a7ab5;
+        }
+
+        /* Текст */
+        .ob-text {
+            font-family: 'Lora', Georgia, serif;
+            font-size: 15px;
+            line-height: 1.7;
+            color: #c0b8a8;
+            margin-bottom: 24px;
+        }
+
+        [data-theme="light"] .ob-text {
+            color: #4a3f35;
+        }
+
+        /* Стрелка-подсказка на КИМ-дисплей */
+        .ob-highlight-arrow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #4FC3F7;
+            letter-spacing: 0.06em;
+            margin-bottom: 20px;
+            padding: 8px 12px;
+            background: rgba(79, 195, 247, 0.06);
+            border: 1px solid rgba(79, 195, 247, 0.15);
+            border-radius: 8px;
+        }
+
+        /* Кнопка «Далее» */
+        .ob-btn-next {
+            width: 100%;
+            background: linear-gradient(135deg, #1a3a5c, #1e4a7a);
+            border: 1px solid rgba(79, 195, 247, 0.4);
+            border-radius: 10px;
+            color: #4FC3F7;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ob-btn-next:hover {
+            background: linear-gradient(135deg, #1e4a7a, #2255a0);
+            box-shadow: 0 0 16px rgba(79, 195, 247, 0.2);
+        }
+
+        /* Кнопка «Понял, читаю» (финальная) */
+        .ob-btn-finish {
+            width: 100%;
+            background: linear-gradient(135deg, #7C4DFF, #4FC3F7);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ob-btn-finish:hover {
+            box-shadow: 0 0 20px rgba(124, 77, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Шаги контент */
+        .ob-step-content { display: none; }
+        .ob-step-content.active { display: block; }
+
+        @media (max-width: 480px) {
+            .ob-card { padding: 24px 20px 20px; }
+            .ob-title { font-size: 13px; }
+            .ob-text  { font-size: 14px; }
+        }
+    </style>
 </head>
-<!-- data-theme="dark" по умолчанию; adapter.js переключает на "light" -->
 <body class="mode-focus" data-theme="dark">
 
-    <!-- КИМ-дисплей: 🧠 — нейросеть активна, ⚙ — эвристика -->
+    <!-- КИМ-дисплей -->
     <div id="kim-display" title="Когнитивный Индекс Момента. 🧠 = CogneeAI, ⚙ = эвристика">КИМ: —</div>
 
     <!-- Ссылка на хронокогнитивный дашборд -->
     <a id="dash-link" href="dashboard.html" title="Твой когнитивный профиль">📊</a>
 
-    <!-- Ссылка на профиль (Блок 2) -->
+    <!-- Ссылка на профиль -->
     <a id="profile-link" href="profile.html" title="Профиль и синхронизация">👤</a>
 
-    <!-- Ссылка на лендинг (Блок 3) -->
+    <!-- Ссылка на лендинг -->
     <a id="landing-link" href="landing.html" title="О проекте Cognee">🌐</a>
 
     <div class="article">
@@ -65,7 +259,7 @@
             </div>
 
             <div class="para-block">
-                <p class="para-full">HTML — это скелет страницы, CSS — её внешность, а JavaScript — мышцы, которые делают её живой. Когда браузер встречает тег &lt;script&gt;, он останавливает загрузку страницы и выполняет код. Именно поэтому разработчики часто размещают скрипты в конце страницы — чтобы пользователь увидел контент раньше, чем начнёт работать весь JavaScript. Современные браузеры настолько оптимизированы, что могут отображать первый экран страницы всего за 50–100 миллисекунд — быстрее, чем вы успеваете моргнуть.</p>
+                <p class="para-full">HTML — это скелет страницы, CSS — её внешность, а JavaScript — мышцы, которые делают её живой. Когда браузер встречает тег &lt;script&gt;, он останавливается и выполняет код. Именно поэтому разработчики часто размещают скрипты в конце страницы — чтобы пользователь увидел контент раньше, чем начнёт работать весь JavaScript. Современные браузеры настолько оптимизированы, что могут отображать первый экран страницы всего за 50–100 миллисекунд — быстрее, чем вы успеваете моргнуть.</p>
                 <p class="para-simple" style="display:none">Сайт состоит из трёх частей: HTML — структура, CSS — внешний вид, JavaScript — интерактивность. Браузер собирает их вместе и показывает страницу.</p>
             </div>
 
@@ -96,24 +290,63 @@
         </main>
     </div>
 
+    <!-- ─── ОНБОРДИНГ ОВЕРЛЕЙ (задача 1.5) ─────────────────────────────────── -->
+    <div id="cognee-onboarding" style="display:none" aria-modal="true" role="dialog" aria-label="Добро пожаловать в Cognee">
+
+        <div class="ob-card">
+            <!-- Крестик закрытия -->
+            <button class="ob-close" id="ob-close-btn" title="Пропустить">×</button>
+
+            <!-- Индикатор шагов -->
+            <div class="ob-steps">
+                <div class="ob-step-dot active" id="ob-dot-1"></div>
+                <div class="ob-step-dot" id="ob-dot-2"></div>
+                <div class="ob-step-dot" id="ob-dot-3"></div>
+            </div>
+
+            <!-- ── Шаг 1: КИМ-дисплей ── -->
+            <div class="ob-step-content active" id="ob-step-1">
+                <span class="ob-icon">🧠</span>
+                <div class="ob-title">Шаг 1 из 3 · КИМ — что это?</div>
+                <p class="ob-text">
+                    Это <strong>КИМ — Когнитивный Индекс Момента</strong> (0–100).<br>
+                    Система уже анализирует твоё поведение прямо сейчас.
+                </p>
+                <div class="ob-highlight-arrow">
+                    → В правом углу видишь число? Это твой КИМ в реальном времени
+                </div>
+                <button class="ob-btn-next" id="ob-next-1">Далее →</button>
+            </div>
+
+            <!-- ── Шаг 2: Скролл ── -->
+            <div class="ob-step-content" id="ob-step-2">
+                <span class="ob-icon">📜</span>
+                <div class="ob-title">Шаг 2 из 3 · Как это работает</div>
+                <p class="ob-text">
+                    Поскролли страницу — посмотри как КИМ меняется.<br>
+                    Быстрый скролл, возвраты назад, паузы — всё это сигналы.<br>
+                    Каждые 20 секунд нейросеть пересчитывает индекс.
+                </p>
+                <button class="ob-btn-next" id="ob-next-2">Далее →</button>
+            </div>
+
+            <!-- ── Шаг 3: Адаптация ── -->
+            <div class="ob-step-content" id="ob-step-3">
+                <span class="ob-icon">✨</span>
+                <div class="ob-title">Шаг 3 из 3 · Магия адаптации</div>
+                <p class="ob-text">
+                    Когда КИМ падает ниже 40 — текст автоматически упрощается.<br>
+                    <em>Без камеры. Без анкеты. Только твоё поведение.</em>
+                </p>
+                <button class="ob-btn-finish" id="ob-finish">✓ Понял, читаю</button>
+            </div>
+        </div>
+
+    </div>
+
     <!--
         ══════════════════════════════════════════════════════════
-        ПОРЯДОК СКРИПТОВ v8.2 — КРИТИЧЕН, НЕ МЕНЯТЬ
-        ══════════════════════════════════════════════════════════
-        1. onnxruntime-web  — инференс ONNX в браузере (CDN)
-        2. config.js        — ключи: COGNEE_GEMINI_KEY, COGNEE_SUPABASE_URL,
-                               COGNEE_SUPABASE_KEY, COGNEE_GEMINI_PROXY_URL
-        3. storage.js       — localStorage профиль + AI-кэш
-        4. supabase.js      — Блок 2: авторизация и облачная синхронизация
-        5. gemini.js        — AI-адаптация (прокси или прямой ключ)
-        6. sensor.js        — КИМ + 16 сенсоров + ONNX инференс
-        7. adapter.js       — адаптация контента + AI-интеграция
-        ──────────────────────────────────────────────────────────
-        Модель: model/cognee_ai.onnx
-
-        КАК СОЗДАТЬ config.js (скопировать config.example.js):
-        Скопируй config.example.js → config.js и заполни ключи.
-        НЕ КОММИТЬ config.js в Git!
+        ПОРЯДОК СКРИПТОВ v9.0 — КРИТИЧЕН
         ══════════════════════════════════════════════════════════
     -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
@@ -125,23 +358,98 @@
     <script src="adapter.js"></script>
     <!-- <script src="analytics.js"></script> -->
 
-    <!-- Блок 2: инициализируем Supabase и показываем статус авторизации -->
+    <!-- ── Инициализация Supabase ── -->
     <script>
         (async function () {
             if (!window.CogneeSupabase) return;
             if (!window.COGNEE_SUPABASE_URL || !window.COGNEE_SUPABASE_KEY) return;
-
             const ok = await CogneeSupabase.init();
-
             if (ok) {
                 const user = CogneeSupabase.getUser();
                 const link = document.getElementById('profile-link');
                 if (link && user) {
                     link.title = user.display_name || user.email || 'Профиль';
-                    link.textContent = '👤';
                 }
             }
         })();
     </script>
+
+    <!-- ── Онбординг (задача 1.5) ── -->
+    <script>
+    (function () {
+        'use strict';
+
+        const ONBOARDED_KEY = 'cognee_onboarded';
+
+        // Показываем только при первом визите
+        if (localStorage.getItem(ONBOARDED_KEY)) return;
+
+        const overlay  = document.getElementById('cognee-onboarding');
+        if (!overlay) return;
+
+        let currentStep = 1;
+        const TOTAL_STEPS = 3;
+
+        // Показываем оверлей
+        overlay.style.display = 'flex';
+
+        // Функция закрытия
+        function closeOnboarding() {
+            overlay.classList.add('ob-hiding');
+            localStorage.setItem(ONBOARDED_KEY, '1');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                overlay.classList.remove('ob-hiding');
+            }, 320);
+        }
+
+        // Функция перехода к следующему шагу
+        function goToStep(step) {
+            // Скрываем текущий шаг
+            const curContent = document.getElementById('ob-step-' + currentStep);
+            const curDot     = document.getElementById('ob-dot-' + currentStep);
+            if (curContent) curContent.classList.remove('active');
+            if (curDot)     { curDot.classList.remove('active'); curDot.classList.add('done'); }
+
+            // Показываем новый шаг
+            currentStep = step;
+            const newContent = document.getElementById('ob-step-' + currentStep);
+            const newDot     = document.getElementById('ob-dot-' + currentStep);
+            if (newContent) newContent.classList.add('active');
+            if (newDot)     newDot.classList.add('active');
+        }
+
+        // Крестик — закрыть
+        const closeBtn = document.getElementById('ob-close-btn');
+        if (closeBtn) closeBtn.addEventListener('click', closeOnboarding);
+
+        // Кнопка «Далее» шаг 1
+        const next1 = document.getElementById('ob-next-1');
+        if (next1) next1.addEventListener('click', () => goToStep(2));
+
+        // Кнопка «Далее» шаг 2
+        const next2 = document.getElementById('ob-next-2');
+        if (next2) next2.addEventListener('click', () => goToStep(3));
+
+        // Кнопка финиш
+        const finish = document.getElementById('ob-finish');
+        if (finish) finish.addEventListener('click', closeOnboarding);
+
+        // Клик по затемнению (вне карточки) — закрыть
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) closeOnboarding();
+        });
+
+        // Esc — закрыть
+        document.addEventListener('keydown', function onEsc(e) {
+            if (e.key === 'Escape') {
+                closeOnboarding();
+                document.removeEventListener('keydown', onEsc);
+            }
+        });
+
+    })();
+    </script>
+
 </body>
 </html>
