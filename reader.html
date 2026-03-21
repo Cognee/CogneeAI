@@ -1,7 +1,8 @@
-<!-- reader.html — v8.5.2 | Глобальная версия: 8.3.1 -->
-<!-- Исправления v8.5.2:
-     - БАГ #2: исправлена версия onnxruntime-web с 1.17.1 на 1.18.0 (как в index.html)
-     - Убрана кнопка Поделиться в Telegram (через article-actions.js v8.5.1)
+<!-- reader.html — v9.1 | Глобальная версия: 9.1 -->
+<!--
+  Блок 2:
+  - Задача 2.2: адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
+  - Задача 2.3: деликатный баннер если КИМ < recommended_kim - 10
 -->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
@@ -15,7 +16,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
-    <!-- ИСПРАВЛЕНИЕ: версия синхронизирована с index.html → 1.18.0 -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
@@ -58,6 +58,42 @@
         .meta-item { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted,#5a7090); }
         .vis-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: rgba(79,195,247,0.12); color: #4FC3F7; border: 1px solid rgba(79,195,247,0.3); border-radius: 4px; padding: 2px 8px; }
 
+        /* Теги статьи */
+        .article-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+        .article-tag {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            background: rgba(124,77,255,0.1); color: #b39ddb;
+            border: 1px solid rgba(124,77,255,0.25); border-radius: 4px;
+            padding: 2px 8px; letter-spacing: 0.04em;
+        }
+
+        /* Баннер рекомендуемого КИМ (задача 2.3) */
+        #kim-recommend-banner {
+            display: none;
+            max-width: var(--reader-max); margin: 16px auto 0; padding: 0 24px;
+        }
+        .kim-banner-inner {
+            background: rgba(255,183,77,0.07);
+            border: 1px solid rgba(255,183,77,0.25);
+            border-left: 3px solid #FFB74D;
+            border-radius: 8px; padding: 10px 14px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: #c49a6c; display: flex; align-items: center; gap: 10px;
+        }
+        .kim-banner-close {
+            margin-left: auto; background: none; border: none;
+            color: #5a7090; cursor: pointer; font-size: 16px; padding: 0;
+        }
+        .kim-banner-close:hover { color: #a0b8d0; }
+
+        /* Адаптивный таймер (задача 2.2) */
+        #read-time-left {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            color: var(--muted,#5a7090); cursor: default;
+            transition: color 0.5s ease;
+        }
+        #read-time-left.mode-tired { color: #FFB74D; }
+
         .article { max-width: var(--reader-max); margin: 32px auto 80px; padding: 0 24px; }
         .article-content-inner { font-family: 'Lora', serif; font-size: 18px; line-height: 1.8; }
         .article-content-inner p  { margin-bottom: 1.4em; }
@@ -80,6 +116,14 @@
         .private-hint { font-size:13px; color:var(--muted,#5a7090); background:rgba(79,195,247,0.06); border:1px solid rgba(79,195,247,0.15); border-radius:8px; padding:16px; margin-bottom:24px; line-height:1.6; }
         .btn-back    { display:inline-block; margin:4px 8px; padding:10px 20px; border-radius:8px; font-size:13px; text-decoration:none; background:rgba(79,195,247,0.1); color:#4FC3F7; border:1px solid rgba(79,195,247,0.3); }
         .btn-catalog { display:inline-block; margin:4px 8px; padding:10px 20px; border-radius:8px; font-size:13px; text-decoration:none; background:rgba(124,77,255,0.1); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
+
+        @media (max-width: 600px) {
+            .reader-nav { padding: 0 12px; }
+            .reader-nav-link { display: none; }
+            .article-title { font-size: clamp(18px, 5vw, 28px); }
+            .meta-row { gap: 8px; }
+            :root { --reader-max: 100%; }
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -122,6 +166,15 @@
         <a class="btn-catalog" href="catalog.html">📚 Каталог</a>
     </div>
 
+    <!-- Баннер рекомендуемого КИМ (задача 2.3) -->
+    <div id="kim-recommend-banner">
+        <div class="kim-banner-inner" id="kim-banner-inner">
+            <span>🧠</span>
+            <span id="kim-banner-text"></span>
+            <button class="kim-banner-close" id="kim-banner-close" title="Закрыть">×</button>
+        </div>
+    </div>
+
     <div class="article-meta" id="article-meta" style="display:none">
         <div class="meta-badge">📄 Статья</div>
         <h1 class="article-title" id="meta-title"></h1>
@@ -130,8 +183,12 @@
             <span class="meta-item" id="meta-author"></span>
             <span class="meta-item" id="meta-date"></span>
             <span class="meta-item" id="meta-read"></span>
+            <!-- Задача 2.2: адаптивный таймер -->
+            <span class="meta-item" id="read-time-left"></span>
             <span class="vis-badge" id="meta-vis-badge" style="display:none"></span>
         </div>
+        <!-- Задача 2.3: теги -->
+        <div class="article-tags" id="article-tags"></div>
     </div>
 
     <div class="article" id="article-content" style="display:none">
@@ -149,6 +206,9 @@
     (function(){
     'use strict';
 
+    // Хранит текущую статью для адаптивного таймера
+    let _currentArticle = null;
+
     window.addEventListener('DOMContentLoaded', async () => {
         CogneeActions.initToastContainer();
 
@@ -161,7 +221,14 @@
             if (!article)         { showError();   return; }
             if (article._private) { showPrivate(); return; }
 
+            _currentArticle = article;
             renderArticle(article);
+
+            // Задача 2.2: запускаем адаптивный таймер
+            initReadingTimer(article);
+
+            // Задача 2.3: показываем баннер если КИМ ниже рекомендуемого
+            checkKIMRecommendation(article);
 
             const me      = CogneeSupabase.getCurrentUser();
             const isOwner = !!(me && me.id === article.user_id);
@@ -175,7 +242,7 @@
             });
 
         } catch(e) {
-            console.error('[Cognee reader v8.5.2]', e);
+            console.error('[Cognee reader v9.1]', e);
             showError();
         }
     });
@@ -195,9 +262,21 @@
             const el = document.getElementById('meta-annotation');
             el.textContent = a.annotation; el.style.display = 'block';
         }
+
         if (a.visibility === 'private') {
             const el = document.getElementById('meta-vis-badge');
             el.textContent = '🔒 приватная'; el.style.display = 'inline-block';
+        }
+
+        // Задача 2.3: показываем теги
+        if (a.tags && a.tags.length > 0) {
+            const tagsEl = document.getElementById('article-tags');
+            a.tags.forEach(tag => {
+                const span = document.createElement('span');
+                span.className   = 'article-tag';
+                span.textContent = tag;
+                tagsEl.appendChild(span);
+            });
         }
 
         document.getElementById('article-meta').style.display   = 'block';
@@ -212,6 +291,87 @@
         }, { passive: true });
     }
 
+    // ─── ЗАДАЧА 2.2: Адаптивный таймер чтения ────────────────────────────────
+    const WPM = { focus: 220, normal: 170, tired: 110 };
+
+    function getZoneLocal(kim) {
+        return kim > 70 ? 'focus' : kim >= 40 ? 'normal' : 'tired';
+    }
+
+    function updateReadingTimer() {
+        const kim  = window.currentKIM || 70;
+        const zone = getZoneLocal(kim);
+        const wpm  = WPM[zone];
+
+        const blocks = document.querySelectorAll('.para-full, .article-content-inner p');
+        let remainingWords = 0;
+        blocks.forEach(p => {
+            const rect = p.getBoundingClientRect();
+            if (rect.top > 0) {
+                remainingWords += (p.textContent || '').trim().split(/\s+/).filter(Boolean).length;
+            }
+        });
+
+        const minutes = Math.ceil(remainingWords / wpm);
+        const el = document.getElementById('read-time-left');
+        if (!el) return;
+
+        const modeLabel = zone === 'tired' ? ' · 🌙 замедленный темп' : '';
+        el.textContent = minutes > 0
+            ? `⏳ ≈ ${minutes} мин${modeLabel}`
+            : '⏳ ≈ < 1 мин';
+
+        // Подсвечиваем в tired
+        el.className = 'meta-item' + (zone === 'tired' ? ' mode-tired' : '');
+    }
+
+    function initReadingTimer(article) {
+        if (!article || !article.content) return;
+
+        // Первый вызов
+        setTimeout(updateReadingTimer, 500);
+
+        // Обновляем при скролле
+        window.addEventListener('scroll', updateReadingTimer, { passive: true });
+
+        // Обновляем при смене КИМ
+        window.addEventListener('cognee:kim', updateReadingTimer);
+    }
+
+    // ─── ЗАДАЧА 2.3: Баннер рекомендуемого КИМ ──────────────────────────────
+    function checkKIMRecommendation(article) {
+        if (!article.recommended_kim) return;
+
+        const currentKIM = window.currentKIM || 70;
+        if (currentKIM >= article.recommended_kim - 10) return;
+
+        const banner   = document.getElementById('kim-recommend-banner');
+        const textEl   = document.getElementById('kim-banner-text');
+        const closeBtn = document.getElementById('kim-banner-close');
+
+        if (!banner || !textEl) return;
+
+        textEl.textContent = `Эта статья лучше читается при КИМ > ${article.recommended_kim}. Сейчас твой КИМ: ${Math.round(currentKIM)}. Можно сделать перерыв или выбрать более простую статью.`;
+
+        banner.style.display = 'block';
+
+        closeBtn.addEventListener('click', () => {
+            banner.style.display = 'none';
+        });
+
+        // Автоматически скрываем через 20 сек
+        setTimeout(() => { banner.style.display = 'none'; }, 20000);
+
+        // Следим за изменением КИМ — если вырос, убираем баннер
+        window.addEventListener('cognee:kim', function onKIMUpdate(e) {
+            if (e.detail.kim >= article.recommended_kim - 10) {
+                banner.style.display = 'none';
+                window.removeEventListener('cognee:kim', onKIMUpdate);
+            }
+        });
+    }
+
+    // ─── Markdown → HTML ──────────────────────────────────────────────────────
     function mdToHtml(text) {
         return text.split(/\n\s*\n/).map(b => {
             b = b.trim(); if (!b) return '';

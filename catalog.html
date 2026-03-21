@@ -1,5 +1,5 @@
-<!-- catalog.html — v8.5.1 | Глобальная версия: 8.5 -->
-<!-- Изменения v8.5.1: кнопка ⋮ на каждой карточке статьи через article-actions.js -->
+<!-- catalog.html — v9.1 | Глобальная версия: 9.1 -->
+<!-- Блок 2, Задача 2.3: отображение тегов на карточках статей -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -35,7 +35,6 @@
                         radial-gradient(ellipse 50% 50% at 85% 100%, rgba(124,77,255,.04) 0%,transparent 60%);
         }
 
-        /* NAV */
         .nav {
             position: sticky; top: 0; z-index: 100;
             background: rgba(10,14,23,.93); backdrop-filter: blur(12px);
@@ -49,13 +48,11 @@
         .nav-link:hover  { color: var(--text); }
         .nav-link.active { color: var(--accent); }
 
-        /* MAIN */
         .catalog-wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 48px 24px 100px; }
         .catalog-hero { margin-bottom: 40px; }
         .catalog-title { font-family:'Unbounded',sans-serif; font-size:clamp(22px,4vw,34px); font-weight:700; letter-spacing:-.03em; margin-bottom:8px; }
         .catalog-sub   { font-size:14px; color:var(--muted); font-style:italic; }
 
-        /* ПОИСК */
         .search-wrap { position:relative; margin-bottom:32px; }
         .search-icon { position:absolute; left:16px; top:50%; transform:translateY(-50%); font-size:16px; pointer-events:none; color:var(--muted); }
         .search-input {
@@ -69,11 +66,9 @@
         .search-clear:hover { color:var(--text); }
         .search-clear.vis   { display:block; }
 
-        /* СТАТУС */
         .catalog-status { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:20px; letter-spacing:.04em; display:flex; align-items:center; justify-content:space-between; }
         .catalog-status span { color:var(--accent); }
 
-        /* КАРТОЧКИ */
         .articles-grid { display:flex; flex-direction:column; gap:14px; }
 
         .article-card {
@@ -88,7 +83,6 @@
             box-shadow: 0 4px 20px rgba(79,195,247,.06);
         }
 
-        /* Шапка карточки: заголовок + время + кнопка ⋮ */
         .article-card-header {
             display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;
         }
@@ -103,7 +97,6 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted); white-space: nowrap; flex-shrink: 0; padding-top: 2px;
         }
-        /* Место для кнопки ⋮ в шапке карточки */
         .card-actions-wrap {
             flex-shrink: 0;
             display: flex; align-items: center;
@@ -111,14 +104,32 @@
 
         .article-card-annotation {
             font-size: 13px; color: var(--muted); line-height: 1.6;
-            margin-bottom: 12px; font-style: italic;
+            margin-bottom: 10px; font-style: italic;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
+
+        /* Теги на карточке (задача 2.3) */
+        .article-card-tags {
+            display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+        }
+        .article-card-tag {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            background: rgba(124,77,255,0.08); color: #b39ddb;
+            border: 1px solid rgba(124,77,255,0.2); border-radius: 4px;
+            padding: 2px 7px; letter-spacing: 0.04em;
+        }
+        /* Рекомендуемый КИМ на карточке */
+        .article-card-kim {
+            font-family: 'JetBrains Mono', monospace; font-size: 10px;
+            background: rgba(79,195,247,0.08); color: #4FC3F7;
+            border: 1px solid rgba(79,195,247,0.2); border-radius: 4px;
+            padding: 2px 7px; letter-spacing: 0.04em;
+        }
+
         .article-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .article-card-author { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
         .article-card-date   { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
 
-        /* ПУСТЫЕ СОСТОЯНИЯ */
         .loading-state { text-align:center; padding:60px 20px; color:var(--muted); font-size:14px; }
         .spinner { width:32px; height:32px; border:3px solid rgba(79,195,247,.15); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 14px; }
         @keyframes spin { to { transform:rotate(360deg); } }
@@ -190,7 +201,7 @@
 <script src="supabase.js"></script>
 <script src="article-actions.js"></script>
 <script>
-// catalog.js inline — v8.5.1
+// catalog.js inline — v9.1
 (function(){
 'use strict';
 
@@ -200,7 +211,7 @@ let _offset      = 0;
 let _loading     = false;
 let _hasMore     = true;
 let _searchTimer = null;
-let _currentUserId = null; // id авторизованного пользователя
+let _currentUserId = null;
 
 window.addEventListener('DOMContentLoaded', async () => {
     CogneeActions.initToastContainer();
@@ -228,7 +239,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     await loadArticles(true);
 });
 
-// ── ПОИСК ─────────────────────────────────────────────────────────────────────
 function setupSearch() {
     const input = document.getElementById('search-input');
     input.addEventListener('input', () => {
@@ -253,7 +263,6 @@ window.clearSearch = function() {
     loadArticles(true);
 };
 
-// ── ЗАГРУЗКА ──────────────────────────────────────────────────────────────────
 async function loadArticles(reset) {
     if (_loading) return;
     _loading = true;
@@ -300,7 +309,7 @@ async function loadArticles(reset) {
             `<div class="empty-state"><div class="empty-icon">⚠️</div>
              <div class="empty-title">Ошибка загрузки</div>
              <div class="empty-sub">${_esc(e.message)}</div></div>`;
-        console.error('[Catalog v8.5.1]', e);
+        console.error('[Catalog v9.1]', e);
     }
     _loading = false;
 }
@@ -309,12 +318,11 @@ window.loadMore = function() {
     if (_hasMore && !_loading) loadArticles(false);
 };
 
-// ── КАРТОЧКА ──────────────────────────────────────────────────────────────────
+// ── КАРТОЧКА (задача 2.3: добавлены теги) ────────────────────────────────────
 function buildCard(article) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:relative';
 
-    // Вся карточка — ссылка
     const a = document.createElement('a');
     a.className = 'article-card';
     a.href = 'reader.html?id=' + article.id;
@@ -326,6 +334,17 @@ function buildCard(article) {
     const titleHtml = _highlight(_esc(article.title || 'Без названия'), _query);
     const isOwner   = !!(_currentUserId && _currentUserId === article.user_id);
 
+    // Строим теги HTML
+    let tagsHtml = '';
+    const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
+    if (tags.length > 0) {
+        const tagSpans = tags.map(t => `<span class="article-card-tag">${_esc(t)}</span>`).join('');
+        const kimBadge = article.recommended_kim
+            ? `<span class="article-card-kim">КИМ ≥ ${article.recommended_kim}</span>`
+            : '';
+        tagsHtml = `<div class="article-card-tags">${tagSpans}${kimBadge}</div>`;
+    }
+
     a.innerHTML = `
         <div class="article-card-header">
             <div class="article-card-title">${titleHtml}</div>
@@ -335,6 +354,7 @@ function buildCard(article) {
         ${article.annotation
             ? `<div class="article-card-annotation">${_esc(article.annotation)}</div>`
             : ''}
+        ${tagsHtml}
         <div class="article-card-footer">
             <div class="article-card-author">👤 ${_esc(article.author_name || 'Автор')}</div>
             <div class="article-card-date">${date}</div>
@@ -342,7 +362,6 @@ function buildCard(article) {
 
     wrap.appendChild(a);
 
-    // Монтируем ⋮ после рендера (нужен DOM-элемент внутри карточки)
     requestAnimationFrame(() => {
         const target = a.querySelector('#ca-wrap-' + article.id);
         if (!target) return;
@@ -352,7 +371,6 @@ function buildCard(article) {
             articleUrl:   'reader.html?id=' + article.id,
             isOwner:      isOwner,
             onDelete:     () => {
-                // Убираем карточку из DOM
                 wrap.style.transition = 'opacity 0.3s';
                 wrap.style.opacity    = '0';
                 setTimeout(() => wrap.remove(), 300);
@@ -363,7 +381,6 @@ function buildCard(article) {
     return wrap;
 }
 
-// ── УТИЛИТЫ ───────────────────────────────────────────────────────────────────
 function updateStatus() {
     const el = document.getElementById('catalog-status');
     if (!el) return;

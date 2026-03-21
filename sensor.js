@@ -1,16 +1,9 @@
-// sensor.js — v8.4
-// Файл: sensor.js | Глобальная версия: 8.4
-// Изменения v8.4:
-//   - Обновлён вектор признаков под новую модель CogneeAI v8.4 (16 признаков)
-//   - FEATURE_SIZE остался 16, но изменился ПОРЯДОК и СЕМАНТИКА признаков
-//   - Новые признаки: paragraph_dwell, scroll_direction_changes,
-//     viewport_revisit_count, micro_pause_density, reading_speed_wpm,
-//     mouse_velocity, focus_loss_count, touch_pressure
-//   - Убраны: dwell_without_progress (переименован), micro_scroll_corrections,
-//     paragraph_reread_rate, reading_speed_variance, interaction_gap,
-//     viewport_lock_duration (переработаны в новые метрики)
-//   - Входной тензор: [1, 16] вместо [1, 1, 16] — MLP не нуждается
-//     в временном измерении
+// sensor.js — v9.1
+// Файл: sensor.js | Глобальная версия: 9.1
+// Блок 2:
+//   - Задача 2.1: детекция застревания на абзаце (>35 сек без скролла вперёд)
+//     → диспатч события cognee:paragraph_struggle
+//   - Задача 2.4: КИМ-снапшоты для умных закладок (window.CogneeBookmarks.snapshot)
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -23,6 +16,9 @@
     const UPDATE_INTERVAL_MS     = 20000;
     const MODEL_PATH             = 'model/cognee_ai.onnx';
     const FEATURE_SIZE           = 16;
+
+    // Задача 2.1: порог застревания (мс)
+    const STRUGGLE_THRESHOLD_MS  = 35000;
 
     // ─── БАЗОВЫЕ СЧЁТЧИКИ ─────────────────────────────────────────────────────
     let scrollScore          = 70;
@@ -39,81 +35,44 @@
     let lastReturnCleanup    = Date.now();
     const returnEvents       = [];
 
-    // ─── ПРИЗНАК 0: scroll_avg_interval ──────────────────────────────────────
+    // ─── ПРИЗНАК 0-1: scroll ──────────────────────────────────────────────────
     const scrollTimestamps      = [];
     let prevScrollYForSpeed     = window.scrollY;
     let prevScrollTimeForSpeed  = Date.now();
 
-    // ─── ПРИЗНАК 1: scroll_variance ──────────────────────────────────────────
-    // (вычисляется из scrollTimestamps)
-
-    // ─── ПРИЗНАК 2: click_pause_avg ──────────────────────────────────────────
-    // (recentClickPause — скользящее среднее)
-
-    // ─── ПРИЗНАК 3: return_scroll_count ──────────────────────────────────────
-    // (returnEventsInWindow)
-
-    // ─── ПРИЗНАК 4: session_duration ─────────────────────────────────────────
-    // (Date.now() - sessionStart)
-
-    // ─── ПРИЗНАК 5: hour ─────────────────────────────────────────────────────
-    // (new Date().getHours())
-
-    // ─── ПРИЗНАК 6: consecutive_rereads ──────────────────────────────────────
-    // (consecutiveRereads)
-
-    // ─── ПРИЗНАК 7: idle_bursts ──────────────────────────────────────────────
-    // (idleBursts)
-
     // ─── ПРИЗНАК 8: paragraph_dwell ──────────────────────────────────────────
-    // Время (в сек) которое пользователь провёл на одном абзаце БЕЗ движения вперёд.
-    // Высокое значение = застревание. Норм. к 120 сек.
-    let paragraphDwellSec    = 0;
+    let paragraphDwellSec     = 0;
     let lastForwardScrollTime = Date.now();
 
     // ─── ПРИЗНАК 9: scroll_direction_changes ─────────────────────────────────
-    // Количество смен направления скролла за последние 30 сек.
-    // Высокое = перечитывание/замешательство. Норм. к 10.
     let directionChangeCount = 0;
     let lastScrollDirection  = 'none';
     let directionWindowReset = Date.now();
 
     // ─── ПРИЗНАК 10: viewport_revisit_count ──────────────────────────────────
-    // Сколько раз пользователь возвращался к уже просмотренным абзацам.
-    // Высокое = непонимание. Норм. к 8.
     const paragraphVisits    = new Map();
     let viewportRevisitCount = 0;
     let paragraphsTracked    = 0;
 
     // ─── ПРИЗНАК 11: micro_pause_density ─────────────────────────────────────
-    // Доля коротких пауз (<200 мс) среди всех движений мыши за последние 30 сек.
-    // Высокое = когнитивная нагрузка. Диапазон 0-1.
     let microPauseCount      = 0;
     let totalMovementEvents  = 0;
     let microPauseWindowReset = Date.now();
     let lastMouseMoveTime    = Date.now();
 
-    // ─── ПРИЗНАК 12: reading_speed_wpm ───────────────────────────────────────
-    // Приблизительная скорость чтения (слов/мин), оценивается по скорости скролла
-    // и среднему количеству слов на экране. Норм. к 400 слов/мин.
-    const speedSamples       = [];    // px/мс
-    const AVG_WORDS_PER_PX   = 0.05; // ~0.05 слова на пиксель (зависит от шрифта)
-
-    // ─── ПРИЗНАК 13: mouse_velocity ──────────────────────────────────────────
-    // Средняя скорость движения мыши (px/сек) за последние 30 сек.
-    // Высокая = рассеянность. Норм. к 1000 px/сек.
+    // ─── ПРИЗНАК 12-13: speed / mouse ────────────────────────────────────────
+    const speedSamples       = [];
+    const AVG_WORDS_PER_PX   = 0.05;
     const mouseVelocitySamples = [];
     let lastMouseX = 0, lastMouseY = 0, lastMouseTime = Date.now();
 
     // ─── ПРИЗНАК 14: focus_loss_count ────────────────────────────────────────
-    // Количество потерь фокуса вкладки за сессию. Норм. к 5.
     let focusLossCount       = 0;
 
     // ─── ПРИЗНАК 15: touch_pressure ──────────────────────────────────────────
-    // 1.0 = тач-устройство, 0.5 = десктоп (нет давления)
     let isTouchDevice = (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)) ? 1.0 : 0.5;
 
-    // ─── СОСТОЯНИЕ ONNX ───────────────────────────────────────────────────────
+    // ─── ONNX ─────────────────────────────────────────────────────────────────
     let onnxSession        = null;
     let modelLoadSuccess   = false;
     let lastProbabilities  = null;
@@ -125,25 +84,55 @@
 
     window.currentKIM = 70;
 
-    // ─── ИМЕНА ПРИЗНАКОВ (порядок совпадает с обучением модели v8.4) ──────────
-    const FEATURE_NAMES = [
-        'scroll_avg_interval',      // 0  норм. к 500 мс
-        'scroll_variance',          // 1  норм. к 200
-        'click_pause_avg',          // 2  норм. к 1000 мс
-        'return_scroll_count',      // 3  норм. к 10
-        'session_duration',         // 4  норм. к 3600 сек
-        'hour',                     // 5  / 24
-        'consecutive_rereads',      // 6  норм. к 5
-        'idle_bursts',              // 7  норм. к 5
-        'paragraph_dwell',          // 8  норм. к 120 сек  ← застревание
-        'scroll_direction_changes', // 9  норм. к 10       ← перечитывание
-        'viewport_revisit_count',   // 10 норм. к 8        ← непонимание
-        'micro_pause_density',      // 11 0-1              ← когн. нагрузка
-        'reading_speed_wpm',        // 12 норм. к 400 сл/мин
-        'mouse_velocity',           // 13 норм. к 1000 px/с
-        'focus_loss_count',         // 14 норм. к 5
-        'touch_pressure',           // 15 0.5 / 1.0
-    ];
+    // ─── ЗАДАЧА 2.1: Детекция застревания ────────────────────────────────────
+    // Диспатчим событие если dwell > 35 сек и пользователь не скроллит
+    let _lastStruggleDispatch    = 0;
+    const STRUGGLE_COOLDOWN_MS   = 60000; // повторно не более раза в минуту
+
+    function _detectStruggle() {
+        const now = Date.now();
+        if (paragraphDwellSec < STRUGGLE_THRESHOLD_MS / 1000) return;
+        if (now - _lastStruggleDispatch < STRUGGLE_COOLDOWN_MS) return;
+
+        // Находим активный абзац в центре viewport
+        const blocks = document.querySelectorAll('.para-block');
+        if (!blocks.length) return;
+
+        const viewportCenter = window.innerHeight / 2;
+        let closestBlock = null;
+        let minDist = Infinity;
+
+        blocks.forEach(block => {
+            const rect = block.getBoundingClientRect();
+            const blockCenter = rect.top + rect.height / 2;
+            const dist = Math.abs(blockCenter - viewportCenter);
+            if (dist < minDist && rect.top > -50 && rect.bottom < window.innerHeight + 50) {
+                minDist = dist;
+                closestBlock = block;
+            }
+        });
+
+        if (!closestBlock) return;
+
+        _lastStruggleDispatch = now;
+        document.dispatchEvent(new CustomEvent('cognee:paragraph_struggle', {
+            detail: { block: closestBlock, dwellSec: paragraphDwellSec }
+        }));
+
+        console.log('[CogneeAI sensor] Застревание на абзаце:', paragraphDwellSec.toFixed(1), 'сек');
+    }
+
+    // ─── ЗАДАЧА 2.4: КИМ-снапшот для умных закладок ──────────────────────────
+    // Публичный API для bookmarks модуля в adapter.js
+    window.CogneeBookmarks = {
+        getKIMSnapshot() {
+            return {
+                kim:  Math.round(smoothedKIM),
+                zone: getZone(smoothedKIM),
+                ts:   Date.now(),
+            };
+        },
+    };
 
     // ─── ПУБЛИЧНЫЙ API ────────────────────────────────────────────────────────
     window.CogneeSensorState = {
@@ -160,6 +149,7 @@
         get avgInferenceMs() {
             return inferenceCount > 0 ? Math.round(inferenceTimeTotal / inferenceCount) : null;
         },
+        get paragraphDwellSec()  { return paragraphDwellSec; },
     };
 
     window.CogneeNeural = {
@@ -167,10 +157,9 @@
         get probabilities() { return lastProbabilities; },
         get inferenceMs()   { return window.CogneeSensorState.avgInferenceMs; },
         getFeatures()       { return buildFeatureVector(); },
-        getFeatureNames()   { return FEATURE_NAMES; },
     };
 
-    // ─── ХРОНОБИОЛОГИЧЕСКИЙ БОНУС (для эвристики) ────────────────────────────
+    // ─── ХРОНОБИОЛОГИЧЕСКИЙ БОНУС ─────────────────────────────────────────────
     function getChronoBonus() {
         const h = new Date().getHours();
         if ((h >= 9 && h <= 11) || (h >= 17 && h <= 19)) return 8;
@@ -179,7 +168,7 @@
         return 0;
     }
 
-    // ─── ВСПОМОГАТЕЛЬНЫЕ ВЫЧИСЛЕНИЯ ──────────────────────────────────────────
+    // ─── ВСПОМОГАТЕЛЬНЫЕ ─────────────────────────────────────────────────────
     function computeScrollAvgInterval() {
         if (scrollTimestamps.length < 2) return 250;
         let sum = 0;
@@ -199,33 +188,25 @@
         );
     }
 
-    // Скорость чтения в словах/мин (оценка через скорость скролла)
     function computeReadingSpeedWPM() {
-        if (speedSamples.length < 2) return 200; // нейтральное значение
+        if (speedSamples.length < 2) return 200;
         const avgPxPerMs = speedSamples.reduce((s, v) => s + v, 0) / speedSamples.length;
-        // px/мс → px/мин → слов/мин
-        const wpm = avgPxPerMs * 60000 * AVG_WORDS_PER_PX;
-        return clamp(wpm, 0, 600);
+        return clamp(avgPxPerMs * 60000 * AVG_WORDS_PER_PX, 0, 600);
     }
 
-    // Средняя скорость мыши в px/сек
     function computeMouseVelocity() {
         if (mouseVelocitySamples.length < 2) return 200;
         return mouseVelocitySamples.reduce((s, v) => s + v, 0) / mouseVelocitySamples.length;
     }
 
-    // Плотность микропауз (0-1)
     function computeMicroPauseDensity() {
         if (totalMovementEvents === 0) return 0;
         return clamp(microPauseCount / totalMovementEvents, 0, 1);
     }
 
-    function recordInteraction() {
-        lastActivityTime = Date.now();
-    }
+    function recordInteraction() { lastActivityTime = Date.now(); }
 
     // ─── ВЕКТОР 16 ПРИЗНАКОВ ─────────────────────────────────────────────────
-    // ПОРЯДОК ОБЯЗАН совпадать с порядком при обучении модели (ячейка 9 блокнота)
     function buildFeatureVector() {
         const f0  = clamp(computeScrollAvgInterval() / 500.0, 0, 1);
         const f1  = clamp(computeScrollVariance() / 200.0, 0, 1);
@@ -235,10 +216,10 @@
         const f5  = clamp(new Date().getHours() / 24.0, 0, 1);
         const f6  = clamp(consecutiveRereads / 5.0, 0, 1);
         const f7  = clamp(idleBursts / 5.0, 0, 1);
-        const f8  = clamp(paragraphDwellSec / 120.0, 0, 1);   // застревание
-        const f9  = clamp(directionChangeCount / 10.0, 0, 1); // смены направления
-        const f10 = clamp(viewportRevisitCount / 8.0, 0, 1);  // возвраты к блокам
-        const f11 = computeMicroPauseDensity();                // когн. нагрузка
+        const f8  = clamp(paragraphDwellSec / 120.0, 0, 1);
+        const f9  = clamp(directionChangeCount / 10.0, 0, 1);
+        const f10 = clamp(viewportRevisitCount / 8.0, 0, 1);
+        const f11 = computeMicroPauseDensity();
         const f12 = clamp(computeReadingSpeedWPM() / 400.0, 0, 1);
         const f13 = clamp(computeMouseVelocity() / 1000.0, 0, 1);
         const f14 = clamp(focusLossCount / 5.0, 0, 1);
@@ -252,14 +233,11 @@
         try {
             const t0       = performance.now();
             const features = buildFeatureVector();
-
-            // Модель v8.4 — MLP, вход [1, 16] (без временного измерения)
             const inputTensor = new ort.Tensor(
                 'float32',
                 Float32Array.from(features),
                 [1, FEATURE_SIZE]
             );
-
             const results = await onnxSession.run({ [onnxSession.inputNames[0]]: inputTensor });
             const proba   = Array.from(results[onnxSession.outputNames[0]].data);
 
@@ -280,8 +258,6 @@
                 `[CogneeAI 🧠] flow:${(proba[0]*100).toFixed(1)}%` +
                 ` normal:${(proba[1]*100).toFixed(1)}%` +
                 ` tired:${(proba[2]*100).toFixed(1)}%` +
-                ` distracted:${(proba[3]*100).toFixed(1)}%` +
-                ` overload:${(proba[4]*100).toFixed(1)}%` +
                 ` → КИМ:${kim.toFixed(1)} (${elapsed.toFixed(2)}мс)`
             );
             return kim;
@@ -293,15 +269,10 @@
 
     // ─── ЭВРИСТИКА (fallback) ─────────────────────────────────────────────────
     function computeKIMHeuristic() {
-        // Штраф за застревание на абзаце (признак 8)
-        const dwellPenalty  = clamp(paragraphDwellSec / 120, 0, 1) * 20;
-        // Штраф за частые смены направления (признак 9)
-        const dirPenalty    = clamp(directionChangeCount / 10, 0, 1) * 15;
-        // Штраф за возвраты к блокам (признак 10)
-        const revisitPenalty = clamp(viewportRevisitCount / 8, 0, 1) * 15;
-        // Штраф за когнитивную нагрузку (признак 11)
+        const dwellPenalty    = clamp(paragraphDwellSec / 120, 0, 1) * 20;
+        const dirPenalty      = clamp(directionChangeCount / 10, 0, 1) * 15;
+        const revisitPenalty  = clamp(viewportRevisitCount / 8, 0, 1) * 15;
         const microPausPenalty = computeMicroPauseDensity() * 10;
-
         const raw = (scrollScore * 0.35) + (clickScore * 0.25) + (returnScore * 0.25)
                   - dwellPenalty - dirPenalty - revisitPenalty - microPausPenalty;
         return clamp(raw + getChronoBonus(), 0, 100);
@@ -349,25 +320,15 @@
         try {
             const t0  = performance.now();
             const url = new URL(MODEL_PATH, window.location.href).href;
-            console.log('[CogneeAI] Загружаю ONNX:', url);
-
             ort.env.wasm.numThreads = 1;
             onnxSession = await ort.InferenceSession.create(url, {
                 executionProviders: ['wasm'],
                 graphOptimizationLevel: 'all',
             });
-
-            console.log('[CogneeAI] Входы:', onnxSession.inputNames,
-                        '| Выходы:', onnxSession.outputNames);
-
-            // Прогревочный прогон — вход [1, 16] для MLP
             const dummy = new ort.Tensor(
-                'float32',
-                new Float32Array(FEATURE_SIZE),
-                [1, FEATURE_SIZE]
+                'float32', new Float32Array(FEATURE_SIZE), [1, FEATURE_SIZE]
             );
             await onnxSession.run({ [onnxSession.inputNames[0]]: dummy });
-
             modelLoadSuccess = true;
             console.log(`[CogneeAI] ✅ ONNX загружена за ${Math.round(performance.now() - t0)}мс`);
             updateNeuralBadge('ready');
@@ -390,26 +351,22 @@
         if (scrollTimestamps.length > 15) scrollTimestamps.shift();
         recordInteraction();
 
-        // Скорость скролла (px/мс) для оценки WPM
         if (dt > 0) {
             speedSamples.push(Math.abs(dy) / dt);
             if (speedSamples.length > 10) speedSamples.shift();
         }
 
-        // Признак 9: смены направления за 30 сек
         const dir = dy > 5 ? 'down' : dy < -5 ? 'up' : lastScrollDirection;
         if (dir !== lastScrollDirection && lastScrollDirection !== 'none') {
             directionChangeCount++;
         }
         lastScrollDirection = dir;
 
-        // Признак 8: сброс таймера застревания при движении вперёд
         if (dy > 30) {
             lastForwardScrollTime = now;
             paragraphDwellSec     = 0;
         }
 
-        // Базовый счётчик скролла
         if (scrollTimestamps.length >= 2) {
             let sum = 0;
             for (let i = 1; i < scrollTimestamps.length; i++)
@@ -445,30 +402,25 @@
     });
 
     // ─── СЕНСОР 3 — Тач ──────────────────────────────────────────────────────
-    document.addEventListener('touchstart', () => {
-        isTouchDevice = 1.0;
-        recordInteraction();
-    }, { passive: true });
+    document.addEventListener('touchstart', () => { isTouchDevice = 1.0; recordInteraction(); }, { passive: true });
     document.addEventListener('touchend', () => { recordInteraction(); }, { passive: true });
     document.addEventListener('keydown',  () => { recordInteraction(); });
 
-    // ─── СЕНСОР 4 — Движение мыши (признак 13: mouse_velocity) ───────────────
+    // ─── СЕНСОР 4 — Движение мыши ─────────────────────────────────────────────
     document.addEventListener('mousemove', e => {
         const now = Date.now();
         const dx  = e.clientX - lastMouseX;
         const dy  = e.clientY - lastMouseY;
         const dt  = now - lastMouseTime;
 
-        if (dt > 0 && dt < 500) { // игнорируем телепортацию
-            const velocity = Math.sqrt(dx*dx + dy*dy) / (dt / 1000); // px/сек
+        if (dt > 0 && dt < 500) {
+            const velocity = Math.sqrt(dx*dx + dy*dy) / (dt / 1000);
             mouseVelocitySamples.push(velocity);
             if (mouseVelocitySamples.length > 15) mouseVelocitySamples.shift();
 
-            // Признак 11: микропаузы — паузы <200 мс между движениями
             totalMovementEvents++;
             if (dt < 200) microPauseCount++;
             if (totalMovementEvents > 100) {
-                // Скользящее окно: нормируем чтобы не переполнялось
                 totalMovementEvents = Math.round(totalMovementEvents * 0.8);
                 microPauseCount     = Math.round(microPauseCount * 0.8);
             }
@@ -480,7 +432,7 @@
         recordInteraction();
     }, { passive: true });
 
-    // ─── СЕНСОР 5 — Потеря фокуса вкладки (признак 14) ───────────────────────
+    // ─── СЕНСОР 5 — Потеря фокуса ─────────────────────────────────────────────
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) focusLossCount = clamp(focusLossCount + 1, 0, 20);
     });
@@ -488,7 +440,7 @@
         focusLossCount = clamp(focusLossCount + 0.5, 0, 20);
     });
 
-    // ─── СЕНСОР 6 — Возвраты скролла (счётчики 3, 6) ─────────────────────────
+    // ─── СЕНСОР 6 — Возвраты скролла ──────────────────────────────────────────
     const yHistory    = [];
     let timeAtBottom  = null;
     let prevScrollDir = 'down';
@@ -518,7 +470,6 @@
             }
         }
 
-        // Очистка старых событий возврата
         if (now - lastReturnCleanup > 30000) {
             const cutoff = now - 5 * 60 * 1000;
             while (returnEvents.length > 0 && returnEvents[0].time < cutoff)
@@ -527,36 +478,35 @@
         }
         returnEventsInWindow = returnEvents.length;
 
-        // Признак 7: idle bursts
         const idleSec = (now - lastActivityTime) / 1000;
         if (idleSec > 45 && idleSec < 120) idleBursts = clamp(idleBursts + 0.5, 0, 10);
     }, 1000);
 
-    // ─── СЕНСОР 7 — Dwell и сброс окон ──────────────────────────────────────
+    // ─── СЕНСОР 7 — Dwell и окна ──────────────────────────────────────────────
     setInterval(() => {
         const now = Date.now();
 
-        // Признак 8: paragraph_dwell — накапливаем время без движения вперёд
         if (now - lastForwardScrollTime > 3000) {
             paragraphDwellSec = (now - lastForwardScrollTime) / 1000;
         }
 
-        // Сброс окна смен направления (признак 9) каждые 30 сек
         if (now - directionWindowReset > 30000) {
             directionChangeCount = 0;
             directionWindowReset = now;
         }
 
-        // Сброс окна микропауз (признак 11) каждые 30 сек
         if (now - microPauseWindowReset > 30000) {
             microPauseCount      = Math.round(microPauseCount * 0.3);
             totalMovementEvents  = Math.round(totalMovementEvents * 0.3);
             microPauseWindowReset = now;
         }
+
+        // Задача 2.1: проверяем застревание каждую секунду
+        _detectStruggle();
+
     }, 1000);
 
-    // ─── СЕНСОР 8 — Paragraph revisits (IntersectionObserver) ───────────────
-    // Признак 10: viewport_revisit_count
+    // ─── СЕНСОР 8 — Paragraph revisits ───────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         const blocks = document.querySelectorAll('.para-block');
         paragraphsTracked = blocks.length;
@@ -568,7 +518,6 @@
                     if (idx === -1) return;
                     const visits = (paragraphVisits.get(idx) || 0) + 1;
                     paragraphVisits.set(idx, visits);
-                    // Второй и последующие визиты = возврат
                     if (visits >= 2) viewportRevisitCount++;
                 });
             }, { threshold: 0.5 });
@@ -576,14 +525,12 @@
         }
     });
 
-    // ─── ВОССТАНОВЛЕНИЕ показателей ──────────────────────────────────────────
+    // ─── ВОССТАНОВЛЕНИЕ ──────────────────────────────────────────────────────
     setInterval(() => {
-        returnScore        = clamp(returnScore + 1, 0, 100);
-        consecutiveRereads = clamp(consecutiveRereads - 0.1, 0, 20);
-        idleBursts         = clamp(idleBursts - 0.2, 0, 10);
-        // Медленное затухание revisit count (пользователь мог уже разобраться)
+        returnScore          = clamp(returnScore + 1, 0, 100);
+        consecutiveRereads   = clamp(consecutiveRereads - 0.1, 0, 20);
+        idleBursts           = clamp(idleBursts - 0.2, 0, 10);
         viewportRevisitCount = clamp(viewportRevisitCount - 0.05, 0, 50);
-        // Медленное затухание focus loss (давние потери менее важны)
         focusLossCount       = clamp(focusLossCount - 0.02, 0, 20);
     }, 5000);
 
@@ -611,7 +558,6 @@
 
         const zone = getZone(smoothedKIM);
 
-        // Обновляем КИМ-дисплей
         const kimEl = document.getElementById('kim-display');
         if (kimEl) {
             const badge = modelLoadSuccess ? '🧠' : '⚙';
@@ -622,12 +568,10 @@
                 zone === 'normal' ? '#81C784' : '#FFB74D';
         }
 
-        // Сохраняем в storage
         if (window.CogneeStorage) {
             window.CogneeStorage.saveKIM(smoothedKIM, zone);
         }
 
-        // Синхронизация с облаком раз в 20 циклов (~7 мин)
         if (window.CogneeSupabase && window.CogneeSupabase.isAuthenticated()) {
             if (!window._kimSyncCounter) window._kimSyncCounter = 0;
             window._kimSyncCounter++;
@@ -638,7 +582,6 @@
             }
         }
 
-        // Применяем адаптацию при значимом изменении КИМ
         const hasSignificantChange = Math.abs(smoothedKIM - (lastKIM ?? 70)) >= KIM_CHANGE_THRESHOLD;
         const isFirstTick          = lastKIM === null;
 
@@ -654,7 +597,6 @@
             }
         }
 
-        // Analytics
         if (window.CogneeAnalytics) {
             window.CogneeAnalytics.sendEvent(smoothedKIM, zone);
         }

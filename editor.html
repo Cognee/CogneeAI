@@ -1,6 +1,5 @@
-<!-- editor.html — v8.4.2 | Глобальная версия: 8.4 -->
-<!-- Блок 4: Редактор статей. Видимость (public/private), черновики, редактирование существующей статьи. -->
-<!-- Публикация через CogneeAI (Gemini): упрощение текста и аннотация. -->
+<!-- editor.html — v9.1 | Глобальная версия: 9.1 -->
+<!-- Блок 2, Задача 2.3: generateTags + recommended_kim в processWithAI и publishArticle -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -45,7 +44,6 @@
                 radial-gradient(ellipse 70% 40% at 10% 0%, rgba(79,195,247,.06) 0%, transparent 60%),
                 radial-gradient(ellipse 50% 40% at 90% 100%, rgba(124,77,255,.05) 0%, transparent 55%);
         }
-        /* NAV */
         .nav {
             position:sticky; top:0; z-index:100;
             background:rgba(10,14,23,.92); backdrop-filter:blur(12px);
@@ -64,7 +62,6 @@
             transition:color .2s;
         }
         .nav-link:hover { color:var(--text); }
-        /* WRAP */
         .editor-wrap {
             position:relative; z-index:1;
             max-width:860px; margin:0 auto; padding:40px 24px 100px;
@@ -75,7 +72,6 @@
             color:var(--text); margin-bottom:6px;
         }
         .page-sub { font-size:14px; color:var(--muted); font-style:italic; margin-bottom:36px; }
-        /* STATS BAR */
         .stats-bar {
             display:flex; gap:28px; padding:12px 0;
             border-top:1px solid var(--border); border-bottom:1px solid var(--border);
@@ -90,7 +86,6 @@
             font-family:'JetBrains Mono',monospace; font-size:10px;
             text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
         }
-        /* FIELDS */
         .field-group { margin-bottom:22px; }
         .field-label {
             display:block; font-family:'JetBrains Mono',monospace; font-size:11px;
@@ -119,7 +114,6 @@
             color:var(--muted); text-align:right; margin-top:4px;
         }
         .field-hint { font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; }
-        /* TOOLBAR */
         .editor-toolbar {
             display:flex; gap:3px; padding:8px 10px;
             background:var(--surface2); border:1px solid var(--border);
@@ -138,8 +132,6 @@
         .editor-with-toolbar .field-input {
             border-top-left-radius:0; border-top-right-radius:0;
         }
-
-        /* ── БЛОК ВИДИМОСТИ ── */
         .visibility-block {
             background:var(--surface2); border:1px solid var(--border);
             border-radius:12px; padding:20px 24px; margin-bottom:28px;
@@ -177,7 +169,6 @@
         .vis-option.selected-private .vis-badge {
             display:block; background:rgba(124,77,255,.15); color:var(--accent2);
         }
-        /* Приватная ссылка-превью */
         .private-note {
             display:none; margin-top:14px;
             padding:10px 14px; border-radius:8px;
@@ -186,8 +177,6 @@
             line-height:1.6;
         }
         .private-note.vis { display:block; }
-
-        /* AI PANEL */
         .ai-panel {
             background:var(--surface2); border:1px solid var(--border);
             border-radius:12px; padding:24px; margin-bottom:28px;
@@ -237,10 +226,17 @@
             border-radius:8px; padding:12px 14px; font-size:14px; line-height:1.65;
             color:var(--text); min-height:36px;
         }
+        /* Теги в результатах AI */
+        .result-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .result-tag {
+            font-family:'JetBrains Mono',monospace; font-size:10px;
+            background:rgba(124,77,255,.1); color:#b39ddb;
+            border:1px solid rgba(124,77,255,.25); border-radius:4px;
+            padding:2px 8px; letter-spacing:.04em;
+        }
         .ai-idle {
             font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted);
         }
-        /* BUTTONS */
         .actions-row { display:flex; gap:11px; flex-wrap:wrap; align-items:center; }
         .btn {
             font-family:'JetBrains Mono',monospace; font-size:13px;
@@ -265,7 +261,6 @@
             background:transparent; border-color:rgba(255,183,77,.3); color:var(--warn);
         }
         .btn-draft:hover:not(:disabled) { border-color:var(--warn); }
-        /* PUBLISH STATUS */
         .pub-status { display:none; margin-top:22px; }
         .pub-status.vis { display:block; }
         .status-card {
@@ -273,6 +268,7 @@
             border-left:3px solid var(--success);
         }
         .status-card.err { border-left-color:var(--danger); }
+        .status-card.warn { border-left-color:var(--warn); }
         .status-title {
             font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
             color:var(--success); margin-bottom:10px;
@@ -293,7 +289,6 @@
         }
         .btn-copy:hover { background:rgba(79,195,247,.2); }
         .btn-copy.copied { color:var(--success); border-color:var(--success); }
-        /* AUTH GUARD */
         .auth-guard { text-align:center; padding:80px 24px; }
         .auth-guard-title {
             font-family:'Unbounded',sans-serif; font-size:22px;
@@ -304,7 +299,6 @@
         .btn-primary:hover:not(:disabled) {
             background:#7fd8f8; box-shadow:0 0 16px rgba(79,195,247,.3);
         }
-        /* TOAST */
         .toast {
             position:fixed; bottom:28px; left:50%;
             transform:translateX(-50%) translateY(20px);
@@ -315,7 +309,6 @@
             white-space:nowrap;
         }
         .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-        /* EDIT MODE BANNER */
         .edit-banner {
             display:none; background:rgba(255,183,77,.07); border:1px solid rgba(255,183,77,.25);
             border-radius:8px; padding:10px 16px; margin-bottom:24px;
@@ -323,7 +316,6 @@
             align-items:center; gap:10px;
         }
         .edit-banner.vis { display:flex; }
-        /* RESPONSIVE */
         @media(max-width:600px){
             .editor-wrap{padding:24px 16px 60px;}
             .nav{padding:0 16px; gap:14px;}
@@ -347,24 +339,20 @@
 
 <div class="editor-wrap">
 
-    <!-- AUTH GUARD -->
     <div class="auth-guard" id="auth-guard" style="display:none">
         <div class="auth-guard-title">Нужна авторизация</div>
         <div class="auth-guard-sub">Войди в аккаунт, чтобы публиковать статьи через CogneeAI</div>
         <a class="btn btn-primary" href="auth.html">Войти / Зарегистрироваться</a>
     </div>
 
-    <!-- РЕДАКТОР -->
     <div id="editor-body">
         <div class="page-title" id="page-title">Редактор статей</div>
-        <div class="page-sub">Пиши — CogneeAI создаст упрощённую версию и аннотацию</div>
+        <div class="page-sub">Пиши — CogneeAI создаст упрощённую версию, аннотацию и теги</div>
 
-        <!-- БАННЕР РЕЖИМА РЕДАКТИРОВАНИЯ -->
         <div class="edit-banner" id="edit-banner">
             ✏️ <span>Режим редактирования статьи</span>
         </div>
 
-        <!-- СЧЁТЧИК -->
         <div class="stats-bar">
             <div class="stat"><span class="stat-val" id="wc-words">0</span><span class="stat-lbl">слов</span></div>
             <div class="stat"><span class="stat-val" id="wc-chars">0</span><span class="stat-lbl">символов</span></div>
@@ -372,7 +360,6 @@
             <div class="stat"><span class="stat-val" id="wc-para">0</span><span class="stat-lbl">абзацев</span></div>
         </div>
 
-        <!-- ЗАГОЛОВОК -->
         <div class="field-group">
             <label class="field-label" for="title-input">Название статьи <span class="req">*</span></label>
             <input type="text" id="title-input" class="field-input"
@@ -380,7 +367,6 @@
             <div class="char-count"><span id="title-chars">0</span> / 200</div>
         </div>
 
-        <!-- ТЕКСТ -->
         <div class="field-group">
             <label class="field-label" for="content-area">Текст статьи <span class="req">*</span></label>
             <div class="editor-with-toolbar">
@@ -396,10 +382,9 @@
                 <textarea id="content-area" class="field-input"
                     placeholder="Напиши свою статью. Каждый абзац разделяй пустой строкой — CogneeAI обработает каждый отдельно."></textarea>
             </div>
-            <div class="field-hint">Разделяй абзацы пустой строкой. Gemini создаст упрощённую версию каждого абзаца для уставших читателей.</div>
+            <div class="field-hint">CogneeAI создаст упрощённую версию, аннотацию и автоматически определит теги статьи.</div>
         </div>
 
-        <!-- ВИДИМОСТЬ -->
         <div class="visibility-block">
             <div class="visibility-title">Видимость статьи</div>
             <div class="vis-options">
@@ -418,11 +403,10 @@
             </div>
             <div class="private-note" id="private-note">
                 🔑 Будет создана уникальная ссылка вида <strong>reader.html?id=s3ihe7hl</strong><br>
-                Числовой ID не будет работать — только секретная ссылка. Поделиться можно будет только с теми, кому доверяешь.
+                Числовой ID не будет работать — только секретная ссылка.
             </div>
         </div>
 
-        <!-- AI ПАНЕЛЬ -->
         <div class="ai-panel">
             <div class="ai-panel-hdr">
                 <span class="ai-dot"></span>
@@ -435,6 +419,7 @@
                     <li class="step" id="step-parse">⟡ Разбивка на абзацы</li>
                     <li class="step" id="step-simplify">⟡ Упрощение текста через Gemini</li>
                     <li class="step" id="step-annotation">⟡ Создание аннотации</li>
+                    <li class="step" id="step-tags">⟡ Определение тегов и сложности</li>
                 </ul>
             </div>
 
@@ -447,14 +432,19 @@
                     <div class="result-lbl">📦 Упрощённые абзацы</div>
                     <div class="result-box" id="res-simplified-count">—</div>
                 </div>
+                <div class="result-block">
+                    <div class="result-lbl">🏷 Теги и сложность</div>
+                    <div class="result-box" id="res-tags">
+                        <div class="result-tags" id="res-tags-list"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="ai-idle" id="ai-idle">
-                Нажми «Обработать через AI» — Gemini создаст адаптивную версию текста.
+                Нажми «Обработать через AI» — Gemini создаст адаптивную версию, аннотацию и теги.
             </div>
         </div>
 
-        <!-- КНОПКИ -->
         <div class="actions-row">
             <button class="btn btn-secondary" id="btn-process" onclick="processWithAI()">
                 🧠 Обработать через AI
@@ -467,7 +457,6 @@
             </button>
         </div>
 
-        <!-- СТАТУС ПУБЛИКАЦИИ -->
         <div class="pub-status" id="pub-status"></div>
     </div>
 </div>
@@ -478,22 +467,22 @@
 <script src="gemini.js"></script>
 
 <script>
-// editor.js inline — v8.4.2
+// editor.js inline — v9.1
 (function(){
 'use strict';
 
-// ── СОСТОЯНИЕ ─────────────────────────────────────────────────────────────────
 const S = {
-    aiDone:     false,
-    simplified: [],   // [{original, simplified}]
-    annotation: '',
-    visibility: 'public',
-    DRAFT_KEY:  'cognee_editor_draft',
-    editId:     null,  // числовой ID при редактировании существующей статьи
-    draftId:    null,  // числовой ID при сохранении черновика (чтобы не дублировать)
+    aiDone:          false,
+    simplified:      [],
+    annotation:      '',
+    tags:            [],
+    recommended_kim: null,
+    visibility:      'public',
+    DRAFT_KEY:       'cognee_editor_draft',
+    editId:          null,
+    draftId:         null,
 };
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
     await initAuth();
     await checkEditMode();
@@ -511,12 +500,10 @@ async function initAuth() {
     }
 }
 
-// Проверяем: открыт ли редактор для редактирования существующей статьи (?edit=ID)
 async function checkEditMode() {
     const params = new URLSearchParams(location.search);
     const editId = params.get('edit');
     if (!editId) return;
-
     if (!window.CogneeSupabase || !window.CogneeSupabase.isAuthenticated()) return;
 
     S.editId = editId;
@@ -528,26 +515,21 @@ async function checkEditMode() {
     try {
         showToast('Загружаем статью…');
         const article = await window.CogneeSupabase.getArticleById(editId);
-        if (!article || article._private) {
-            showToast('Статья не найдена или нет доступа');
-            return;
-        }
+        if (!article || article._private) { showToast('Статья не найдена или нет доступа'); return; }
         document.getElementById('title-input').value = article.title || '';
         document.getElementById('title-chars').textContent = (article.title || '').length;
         document.getElementById('content-area').value = article.content || '';
         updateStats(article.content || '');
-
-        // Восстанавливаем видимость
         if (article.visibility === 'private') selectVisibility('private');
-
-        // Восстанавливаем AI-данные если есть
         if (article.annotation) {
             S.annotation = article.annotation || '';
+            S.tags       = Array.isArray(article.tags) ? article.tags : [];
+            S.recommended_kim = article.recommended_kim || null;
             if (article.content_simple) {
                 try { S.simplified = JSON.parse(article.content_simple); } catch(e) {}
             }
             S.aiDone = true;
-            showAIResults(article.annotation, [], S.simplified.length);
+            showAIResults(article.annotation, [], S.simplified.length, S.tags, S.recommended_kim);
             document.getElementById('btn-publish').disabled = false;
         }
     } catch(e) {
@@ -555,26 +537,17 @@ async function checkEditMode() {
     }
 }
 
-// ── ВЫБОР ВИДИМОСТИ ───────────────────────────────────────────────────────────
 window.selectVisibility = function(val) {
     S.visibility = val;
     const pubBtn  = document.getElementById('vis-public');
     const privBtn = document.getElementById('vis-private');
     const note    = document.getElementById('private-note');
-
     pubBtn.classList.remove('selected', 'selected-private');
     privBtn.classList.remove('selected', 'selected-private');
-
-    if (val === 'public') {
-        pubBtn.classList.add('selected');
-        note.classList.remove('vis');
-    } else {
-        privBtn.classList.add('selected-private');
-        note.classList.add('vis');
-    }
+    if (val === 'public') { pubBtn.classList.add('selected'); note.classList.remove('vis'); }
+    else { privBtn.classList.add('selected-private'); note.classList.add('vis'); }
 };
 
-// ── СЧЁТЧИКИ ──────────────────────────────────────────────────────────────────
 function setupCounters() {
     const title = document.getElementById('title-input');
     const area  = document.getElementById('content-area');
@@ -590,16 +563,12 @@ function setupCounters() {
 
 function updateStats(text) {
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-    const chars = text.length;
-    const read  = Math.max(1, Math.round(words / 200));
-    const para  = text.split(/\n\s*\n/).filter(p => p.trim()).length;
     document.getElementById('wc-words').textContent = words;
-    document.getElementById('wc-chars').textContent = chars;
-    document.getElementById('wc-read').textContent  = read;
-    document.getElementById('wc-para').textContent  = para;
+    document.getElementById('wc-chars').textContent = text.length;
+    document.getElementById('wc-read').textContent  = Math.max(1, Math.round(words / 200));
+    document.getElementById('wc-para').textContent  = text.split(/\n\s*\n/).filter(p => p.trim()).length;
 }
 
-// ── ТУЛБАР ────────────────────────────────────────────────────────────────────
 function setupToolbar() {
     document.querySelectorAll('.tool-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -614,7 +583,6 @@ function setupToolbar() {
             else if (cmd === 'quote')  insertion = `\n> ${sel || 'Цитата'}\n`;
             else if (cmd === 'ul')     insertion = `\n- ${sel || 'Пункт списка'}\n- Ещё пункт\n`;
             else if (cmd === 'hr')     insertion = '\n---\n';
-
             const start = area.selectionStart;
             area.setRangeText(insertion, start, area.selectionEnd, 'end');
             area.dispatchEvent(new Event('input'));
@@ -623,21 +591,14 @@ function setupToolbar() {
     });
 }
 
-// ── ЧЕРНОВИК ──────────────────────────────────────────────────────────────────
 function restoreDraft() {
-    if (S.editId) return; // В режиме редактирования черновик не восстанавливаем
+    if (S.editId) return;
     try {
         const saved = localStorage.getItem(S.DRAFT_KEY);
         if (!saved) return;
         const d = JSON.parse(saved);
-        if (d.title) {
-            document.getElementById('title-input').value = d.title;
-            document.getElementById('title-chars').textContent = d.title.length;
-        }
-        if (d.content) {
-            document.getElementById('content-area').value = d.content;
-            updateStats(d.content);
-        }
+        if (d.title) { document.getElementById('title-input').value = d.title; document.getElementById('title-chars').textContent = d.title.length; }
+        if (d.content) { document.getElementById('content-area').value = d.content; updateStats(d.content); }
         if (d.visibility) selectVisibility(d.visibility);
         showToast('Черновик восстановлен');
     } catch(e) {}
@@ -646,79 +607,62 @@ function restoreDraft() {
 window.saveDraft = async function() {
     const title   = document.getElementById('title-input').value.trim();
     const content = document.getElementById('content-area').value.trim();
-
     if (!title && !content) { showToast('Нечего сохранять'); return; }
-
     const btn = document.getElementById('btn-draft');
     btn.disabled = true; btn.textContent = '💾 Сохраняем…';
-
     if (window.CogneeSupabase && window.CogneeSupabase.isAuthenticated() && title && content) {
         try {
             if (S.draftId) {
-                // Обновляем существующий черновик — не создаём новый
                 await window.CogneeSupabase.updateArticle(S.draftId, {
                     title, content,
                     content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                    keywords: [],
-                    annotation: S.annotation        ? S.annotation  : undefined,
-                    visibility: S.visibility,
-                    is_draft:   true,
+                    keywords: S.tags || [],
+                    annotation: S.annotation || undefined,
+                    visibility: S.visibility, is_draft: true,
                 });
                 showToast('✓ Черновик обновлён');
             } else {
-                // Первое сохранение — создаём новую запись
                 const result = await window.CogneeSupabase.publishArticle({
                     title, content,
                     content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
-                    keywords: [],
+                    keywords: S.tags || [],
                     annotation: S.annotation,
-                    visibility: S.visibility,
-                    is_draft:   true,
+                    visibility: S.visibility, is_draft: true,
                 });
                 S.draftId = result.id;
                 showToast('✓ Черновик сохранён в облаке');
             }
         } catch(e) {
-            console.warn('[Editor] Ошибка сохранения в Supabase:', e.message);
             _saveDraftLocal(title, content);
         }
     } else {
         _saveDraftLocal(title, content);
     }
-
     btn.disabled = false; btn.textContent = '💾 Сохранить черновик';
 };
+
 function _saveDraftLocal(title, content) {
     try {
         localStorage.setItem(S.DRAFT_KEY, JSON.stringify({ title, content, visibility: S.visibility }));
         showToast('✓ Черновик сохранён локально');
-    } catch(e) {
-        showToast('Ошибка сохранения');
-    }
+    } catch(e) { showToast('Ошибка сохранения'); }
 }
 
-// ── AI ОБРАБОТКА ──────────────────────────────────────────────────────────────
+// ─── AI ОБРАБОТКА (задача 2.3: добавлен шаг generateTags) ───────────────────
 window.processWithAI = async function() {
     const title   = document.getElementById('title-input').value.trim();
     const content = document.getElementById('content-area').value.trim();
-
     if (!title)   { showToast('Введи название статьи'); return; }
     if (content.length < 100) { showToast('Текст слишком короткий (мин. 100 символов)'); return; }
-
-    if (!window.CogneeAI) {
-        showToast('CogneeAI не подключён — проверь gemini.js');
-        return;
-    }
+    if (!window.CogneeAI) { showToast('CogneeAI не подключён — проверь gemini.js'); return; }
 
     const btn = document.getElementById('btn-process');
     btn.disabled = true;
-
     document.getElementById('ai-idle').style.display    = 'none';
     document.getElementById('ai-results').classList.remove('vis');
     document.getElementById('ai-progress').classList.add('vis');
 
-    const steps = ['step-parse', 'step-simplify', 'step-annotation'];
-    steps.forEach(id => {
+    ['step-parse','step-simplify','step-annotation','step-tags'].forEach(id => {
         const el = document.getElementById(id);
         el.className = 'step';
         el.textContent = '⟡ ' + el.textContent.replace(/^[✓⟡] /, '');
@@ -735,11 +679,12 @@ window.processWithAI = async function() {
     try {
         // 1. Парсим абзацы
         setStep('step-parse', 'active');
-        const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim() && !p.trim().startsWith('#') && !p.trim().startsWith('-') && !p.trim().startsWith('>'));
+        const paragraphs = content.split(/\n\s*\n/).filter(p =>
+            p.trim() && !p.trim().startsWith('#') && !p.trim().startsWith('-') && !p.trim().startsWith('>'));
         await _delay(200);
         setStep('step-parse', 'done');
 
-        // 2. Упрощение через Gemini
+        // 2. Упрощение
         setStep('step-simplify', 'active');
         const simplified = await window.CogneeAI.simplifyParagraphs(paragraphs);
         S.simplified = simplified;
@@ -751,9 +696,16 @@ window.processWithAI = async function() {
         S.annotation = annotation;
         setStep('step-annotation', 'done');
 
+        // 4. Задача 2.3: Теги и рекомендуемый КИМ
+        setStep('step-tags', 'active');
+        const tagsData = await window.CogneeAI.generateTags(content);
+        S.tags            = tagsData.tags            || [];
+        S.recommended_kim = tagsData.recommended_kim || null;
+        setStep('step-tags', 'done');
+
         S.aiDone = true;
         document.getElementById('ai-progress').classList.remove('vis');
-        showAIResults(annotation, [], simplified.length);
+        showAIResults(annotation, [], simplified.length, S.tags, S.recommended_kim);
         document.getElementById('btn-publish').disabled = false;
         showToast('✓ AI обработка завершена');
 
@@ -767,22 +719,44 @@ window.processWithAI = async function() {
     btn.disabled = false;
 };
 
-function showAIResults(annotation, _keywords, simplifiedCount) {
+function showAIResults(annotation, _keywords, simplifiedCount, tags, recommendedKim) {
     document.getElementById('res-annotation').textContent  = annotation || '—';
     document.getElementById('res-simplified-count').textContent =
         simplifiedCount > 0 ? `Упрощено абзацев: ${simplifiedCount}` : 'Упрощение не выполнено';
+
+    // Задача 2.3: отображаем теги
+    const tagsList = document.getElementById('res-tags-list');
+    tagsList.innerHTML = '';
+    if (tags && tags.length > 0) {
+        tags.forEach(tag => {
+            const span = document.createElement('span');
+            span.className   = 'result-tag';
+            span.textContent = tag;
+            tagsList.appendChild(span);
+        });
+        if (recommendedKim) {
+            const kimSpan = document.createElement('span');
+            kimSpan.className   = 'result-tag';
+            kimSpan.textContent = `КИМ ≥ ${recommendedKim}`;
+            kimSpan.style.background = 'rgba(79,195,247,0.1)';
+            kimSpan.style.color      = '#4FC3F7';
+            kimSpan.style.borderColor = 'rgba(79,195,247,0.25)';
+            tagsList.appendChild(kimSpan);
+        }
+    } else {
+        tagsList.textContent = '—';
+    }
+
     document.getElementById('ai-results').classList.add('vis');
     document.getElementById('ai-idle').style.display = 'none';
 }
 
-// ── ПУБЛИКАЦИЯ / СОХРАНЕНИЕ ───────────────────────────────────────────────────
+// ─── ПУБЛИКАЦИЯ (задача 2.3: передаём tags и recommended_kim) ────────────────
 window.doPublish = async function() {
     const title   = document.getElementById('title-input').value.trim();
     const content = document.getElementById('content-area').value.trim();
-
     if (!title)   { showToast('Введи название'); return; }
     if (!content) { showToast('Введи текст статьи'); return; }
-
     if (!window.CogneeSupabase || !window.CogneeSupabase.isAuthenticated()) {
         showToast('Нужна авторизация'); return;
     }
@@ -790,34 +764,38 @@ window.doPublish = async function() {
     const btn = document.getElementById('btn-publish');
     btn.disabled = true;
     btn.textContent = S.editId ? '💾 Сохраняем…' : '🚀 Публикуем…';
-
     const pubStatus = document.getElementById('pub-status');
     pubStatus.classList.remove('vis');
 
+    // Считаем время чтения
+    const words      = content.trim().split(/\s+/).length;
+    const readMinutes = Math.max(1, Math.round(words / 200));
+
     try {
         if (S.editId) {
-            // Редактирование существующей статьи
             await window.CogneeSupabase.updateArticle(S.editId, {
                 title, content,
-                content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                keywords: [],
-                annotation: S.annotation        ? S.annotation  : undefined,
-                visibility: S.visibility,
-                is_draft:   false,
+                content_simple:  S.simplified.length ? JSON.stringify(S.simplified) : undefined,
+                keywords:        S.tags || [],
+                annotation:      S.annotation || undefined,
+                recommended_kim: S.recommended_kim || undefined,
+                read_minutes:    readMinutes,
+                visibility:      S.visibility,
+                is_draft:        false,
             });
             _showPublishSuccess(pubStatus, 'reader.html?id=' + S.editId, S.visibility, null, true);
 
         } else if (S.draftId) {
-            // Публикация сохранённого черновика — обновляем is_draft=false
             await window.CogneeSupabase.updateArticle(S.draftId, {
                 title, content,
-                content_simple: S.simplified.length ? JSON.stringify(S.simplified) : undefined,
-                keywords: [],
-                annotation: S.annotation        ? S.annotation  : undefined,
-                visibility: S.visibility,
-                is_draft:   false,
+                content_simple:  S.simplified.length ? JSON.stringify(S.simplified) : undefined,
+                keywords:        S.tags || [],
+                annotation:      S.annotation || undefined,
+                recommended_kim: S.recommended_kim || undefined,
+                read_minutes:    readMinutes,
+                visibility:      S.visibility,
+                is_draft:        false,
             });
-            // Нужен slug для приватной ссылки — грузим статью
             let articleUrl;
             if (S.visibility === 'private') {
                 try {
@@ -831,14 +809,15 @@ window.doPublish = async function() {
             _showPublishSuccess(pubStatus, articleUrl, S.visibility, null, false);
 
         } else {
-            // Новая статья
             const result = await window.CogneeSupabase.publishArticle({
                 title, content,
-                content_simple: S.simplified.length ? JSON.stringify(S.simplified) : null,
-                keywords: [],
-                annotation: S.annotation,
-                visibility: S.visibility,
-                is_draft:   false,
+                content_simple:  S.simplified.length ? JSON.stringify(S.simplified) : null,
+                keywords:        S.tags || [],
+                annotation:      S.annotation,
+                recommended_kim: S.recommended_kim,
+                read_minutes:    readMinutes,
+                visibility:      S.visibility,
+                is_draft:        false,
             });
             try { localStorage.removeItem(S.DRAFT_KEY); } catch(e) {}
             const articleUrl = S.visibility === 'private'
@@ -857,9 +836,9 @@ window.doPublish = async function() {
     btn.disabled = false;
     btn.textContent = S.editId ? '💾 Сохранить изменения' : '🚀 Опубликовать';
 };
+
 function _showPublishSuccess(pubStatus, articleUrl, visibility, slug, isEdit) {
     pubStatus.classList.add('vis');
-
     const visLabel = visibility === 'private'
         ? '🔒 Приватная — доступна только по секретной ссылке'
         : '🌐 Публичная — видна в каталоге и по ID';
@@ -876,9 +855,7 @@ function _showPublishSuccess(pubStatus, articleUrl, visibility, slug, isEdit) {
 
     pubStatus.innerHTML = `
         <div class="status-card">
-            <div class="status-title">
-                ${isEdit ? '✓ Статья обновлена' : '✓ Статья опубликована'}
-            </div>
+            <div class="status-title">${isEdit ? '✓ Статья обновлена' : '✓ Статья опубликована'}</div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${visLabel}</div>
             <div class="link-row">
                 <span class="status-link" id="pub-link">${location.origin}${location.pathname.replace('editor.html','')}${articleUrl}</span>
@@ -897,13 +874,11 @@ window.copyPubLink = function() {
     if (!link) return;
     navigator.clipboard.writeText(link.textContent).then(() => {
         const btn = document.getElementById('btn-copy-pub');
-        btn.textContent = '✓ Скопировано';
-        btn.classList.add('copied');
+        btn.textContent = '✓ Скопировано'; btn.classList.add('copied');
         setTimeout(() => { btn.textContent = 'Скопировать'; btn.classList.remove('copied'); }, 2500);
     }).catch(() => {});
 };
 
-// ── ВСПОМОГАТЕЛЬНЫЕ ───────────────────────────────────────────────────────────
 function _delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function _esc(s) {

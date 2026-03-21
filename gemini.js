@@ -1,11 +1,8 @@
-// gemini.js — v8.4.1
-// Файл: gemini.js | Глобальная версия: 8.3.1
-// Исправления v8.4.1:
-//   - БАГ #6: защита от дублирующихся запросов в очереди — проверка кэша
-//     перенесена внутрь enqueue-функции, а не только снаружи. Теперь
-//     если при быстрой смене режимов один и тот же текст попал в очередь
-//     дважды, второй вызов вернёт кэш без повторного запроса к Gemini.
-//   - Сохранена вся логика v8.4 (proxy, direct, annotation, batch)
+// gemini.js — v9.1
+// Файл: gemini.js | Глобальная версия: 9.1
+// Блок 2:
+//   - Задача 2.1: добавлена функция rephraseText(text) — "Объясни иначе"
+//   - Задача 2.3: добавлена функция generateTags(text) — AI-теги и рекомендуемый КИМ
 
 (function () {
     'use strict';
@@ -36,7 +33,6 @@
             const response = await fetch(transport.url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // ИСПРАВЛЕНИЕ: отправляем { task, text, lang } как ожидает Edge Function
                 body: JSON.stringify({ task, text, lang: 'ru' }),
             });
             if (!response.ok) {
@@ -47,6 +43,8 @@
             if (task === 'simplify')   return data.simplified  || '';
             if (task === 'keywords')   return data.keywords    || [];
             if (task === 'annotation') return data.annotation  || '';
+            if (task === 'rephrase')   return data.rephrased   || '';
+            if (task === 'tags')       return data;  // возвращаем весь объект {tags, recommended_kim}
             return data;
         }
 
@@ -58,7 +56,12 @@
         if      (task === 'simplify')   prompt = _simplifyPrompt(text);
         else if (task === 'keywords')   prompt = _keywordsPrompt(text);
         else if (task === 'annotation') prompt = _annotationPrompt(text);
+        else if (task === 'rephrase')   prompt = _rephrasePrompt(text);
+        else if (task === 'tags')       prompt = _tagsPrompt(text);
         else throw new Error('Неизвестный task: ' + task);
+
+        const temperature = task === 'rephrase' ? 0.7 : 0.3;
+        const maxTokens   = task === 'rephrase' ? 350 : task === 'tags' ? 200 : task === 'simplify' ? 300 : 250;
 
         const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey;
         const response = await fetch(url, {
@@ -66,10 +69,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: task === 'simplify' ? 0.4 : task === 'annotation' ? 0.5 : 0.2,
-                    maxOutputTokens: task === 'simplify' ? 300 : task === 'annotation' ? 250 : 150,
-                }
+                generationConfig: { temperature, maxOutputTokens: maxTokens }
             }),
         });
 
@@ -83,12 +83,28 @@
 
         if (task === 'simplify')   return raw.trim();
         if (task === 'annotation') return raw.trim();
+        if (task === 'rephrase')   return raw.trim();
 
+        if (task === 'tags') {
+            try {
+                const cleaned = raw.trim().replace(/^```json\s*/,'').replace(/```\s*$/,'');
+                const parsed  = JSON.parse(cleaned);
+                return {
+                    tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [],
+                    recommended_kim: typeof parsed.recommended_kim === 'number'
+                        ? Math.min(100, Math.max(40, parsed.recommended_kim)) : null,
+                };
+            } catch {
+                return { tags: [], recommended_kim: null };
+            }
+        }
+
+        // keywords
         try {
             const clean = raw.trim().replace(/^```json\s*/,'').replace(/```\s*$/,'');
             const arr   = JSON.parse(clean);
             if (Array.isArray(arr)) return arr.slice(0, 10).map(String);
-        } catch (e) {}
+        } catch {}
         return raw.split(/[,\n]/).map(s => s.trim()).filter(Boolean).slice(0, 10);
     }
 
@@ -110,14 +126,25 @@
                'Верни ТОЛЬКО текст аннотации, без заголовков.\n\nСтатья:\n' + text.slice(0, 3000);
     }
 
+    function _rephrasePrompt(text) {
+        return 'Объясни следующий абзац ДРУГИМ способом, используя аналогию из повседневной жизни.\n' +
+               'Язык: русский.\n' +
+               'Правила: используй сравнение или бытовой пример, 2–4 предложения, живо и понятно.\n' +
+               'Ответь ТОЛЬКО перефразированным текстом, без предисловий.\n\nАбзац:\n' + text;
+    }
+
+    function _tagsPrompt(text) {
+        return 'Определи 3–5 тегов для этого текста и оптимальный КИМ читателя (число 40-100).\n' +
+               'Теги: технологии, история, наука, бизнес, образование, психология, медицина, философия, искусство, спорт, политика, экономика, экология, культура, юмор.\n' +
+               'Верни СТРОГО JSON без пояснений: {"tags": ["тег1", "тег2"], "recommended_kim": 65}\n\nТекст:\n' +
+               text.slice(0, 2000);
+    }
+
     // ─── ОЧЕРЕДЬ ЗАПРОСОВ ────────────────────────────────────────────────────
-    // ИСПРАВЛЕНИЕ БАГ #6: enqueue принимает fn и ключ дедупликации.
-    // Если ключ уже in-flight — возвращает Promise ожидания, а не ставит ещё один запрос.
     function enqueue(fn, dedupeKey) {
-        // Если такой запрос уже летит — не дублируем
         if (dedupeKey && _inFlight.has(dedupeKey)) {
             return new Promise((resolve, reject) => {
-                requestQueue.push({ fn, resolve, reject, dedupeKey: null }); // всё равно выполним, но без ключа
+                requestQueue.push({ fn, resolve, reject, dedupeKey: null });
             });
         }
 
@@ -159,7 +186,6 @@
         const cached = window.CogneeStorage?.getSimplified(hash);
         if (cached) return cached;
 
-        // ИСПРАВЛЕНИЕ БАГ #6: передаём ключ дедупликации
         try {
             const simplified = await enqueue(
                 () => callViaProxy('simplify', text),
@@ -222,6 +248,47 @@
         }
     }
 
+    // ─── Задача 2.1: "Объясни иначе" ─────────────────────────────────────────
+    async function rephraseText(text) {
+        const hash   = textHash('rephrase_' + text);
+        const cached = window.CogneeStorage?.getSimplified('reph_' + hash);
+        if (cached) return cached;
+
+        try {
+            const result = await enqueue(
+                () => callViaProxy('rephrase', text),
+                'rephrase_' + hash
+            );
+            const rephrased = typeof result === 'string' ? result : '';
+            if (rephrased) window.CogneeStorage?.saveSimplified('reph_' + hash, rephrased);
+            return rephrased;
+        } catch (e) {
+            console.warn('[CogneeAI] Перефраз fallback:', e.message);
+            return '';
+        }
+    }
+
+    // ─── Задача 2.3: AI-теги и рекомендуемый КИМ ─────────────────────────────
+    async function generateTags(text) {
+        const hash = textHash('tags_' + text.slice(0, 200));
+        try {
+            const result = await enqueue(
+                () => callViaProxy('tags', text),
+                'tags_' + hash
+            );
+            if (result && typeof result === 'object') {
+                return {
+                    tags:            Array.isArray(result.tags) ? result.tags : [],
+                    recommended_kim: result.recommended_kim || null,
+                };
+            }
+            return { tags: [], recommended_kim: null };
+        } catch (e) {
+            console.warn('[CogneeAI] Теги fallback:', e.message);
+            return { tags: [], recommended_kim: null };
+        }
+    }
+
     function _getStatusLabel() {
         const t = _getTransport();
         if (!t) return '✗ AI не настроен';
@@ -236,7 +303,9 @@
         generateAnnotation,
         textHash,
         extractKeywords,
+        rephraseText,
+        generateTags,
     };
 
-    console.log('[CogneeAI gemini.js v8.4.1] Загружен. Транспорт:', _getStatusLabel());
+    console.log('[CogneeAI gemini.js v9.1] Загружен. Транспорт:', _getStatusLabel());
 })();

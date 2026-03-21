@@ -1,12 +1,9 @@
-<!-- landing.html — v9.0 | Глобальная версия: 9.0 -->
+<!-- landing.html — v9.1 | Глобальная версия: 9.1 -->
 <!--
-  Изменения v9.0 (Блок 1, Задача 1.1):
-  - Удалён старый JavaScript-счётчик Math.random() для КИМ
-  - Подключены реальные скрипты (onnxruntime → config → storage → supabase → gemini → sensor → adapter)
-  - Добавлен #kim-display в навбар (справа от кнопки «Попробовать»)
-  - Секция «Как работает» обёрнута в .para-block / .para-full / .para-simple — адаптация видна вживую
-  - Добавлена CSS-анимация @keyframes kim-pulse в <style> (дублируется в styles.css)
-  - Счётчик «читают сейчас» сохранён (Math.random — допустимо для UX-декора, не для КИМ)
+  Изменения v9.1:
+  - Убрано выделение слов на лендинге: на .steps-grid добавлен data-no-keywords="true"
+  - adapter.js теперь пропускает .para-full внутри таких контейнеров
+  - Все остальные изменения из v9.0 сохранены (живой КИМ, para-block в шагах)
 -->
 <!DOCTYPE html>
 <html lang="ru">
@@ -50,7 +47,6 @@
             background: var(--bg);
             color: var(--text);
             overflow-x: hidden;
-            /* Переопределяем стили из styles.css для тела лендинга */
             padding-bottom: 0;
         }
 
@@ -96,8 +92,7 @@
         }
         .nav-cta:hover { background: #7fd8f8; box-shadow: 0 0 12px rgba(79,195,247,.3); }
 
-        /* ── КИМ в навбаре (задача 1.1) ── */
-        /* #kim-display переопределяется из styles.css — нужно вписать в nav */
+        /* ── КИМ в навбаре ── */
         .nav-kim {
             font-family: 'JetBrains Mono', monospace; font-size: 12px;
             background: rgba(10,16,32,0.9); border: 1px solid rgba(79,195,247,.25);
@@ -110,7 +105,6 @@
         .nav-kim.zone-normal { border-left-color: #81C784; }
         .nav-kim.zone-tired  { border-left-color: #FFB74D; }
 
-        /* Пульс при смене зоны (задача 1.1) */
         .nav-kim.kim-pulse-anim {
             animation: kim-pulse 0.6s ease;
         }
@@ -184,8 +178,6 @@
         }
         .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
-
-
         /* ── PROBLEM ── */
         .problem {
             padding: 100px 24px;
@@ -243,7 +235,7 @@
         .fill-normal { background: var(--success); }
         .fill-tired  { background: var(--warn); }
 
-        /* ── HOW IT WORKS (задача 1.1: para-block разметка) ── */
+        /* ── HOW IT WORKS ── */
         .how {
             padding: 100px 24px;
             max-width: 1100px; margin: 0 auto;
@@ -276,8 +268,18 @@
             font-size: 14px; color: var(--muted); line-height: 1.65;
             margin: 0; padding: 0; font-family: 'Lora', Georgia, serif;
         }
-        /* Переопределяем скрытие para-simple из styles.css */
         .step-card .para-simple { display: none; }
+
+        /* Ключевые слова в карточках шагов — НЕ выделяем (переопределяем глобальные стили) */
+        .step-card .keyword,
+        .step-card .keyword-ai {
+            background: none !important;
+            color: inherit !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+        }
 
         .step-tech   { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; }
         .tech-tag    { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: rgba(79,195,247,.07); border: 1px solid rgba(79,195,247,.15); border-radius: 4px; padding: 2px 8px; color: var(--accent); letter-spacing: .04em; }
@@ -348,19 +350,18 @@
             .nav-kim { font-size: 11px; padding: 4px 8px; }
         }
 
-        /* Переопределяем фиксированный #kim-display из styles.css — на лендинге он встроен в nav */
-        #kim-display {
-            /* Скрываем глобальный фиксированный КИМ-дисплей на лендинге */
-            display: none !important;
-        }
-        /* Иконки dash/profile/landing тоже прячем — они не нужны на лендинге */
+        /* Переопределяем фиксированный #kim-display из styles.css — на лендинге встроен в nav */
+        #kim-display { display: none !important; }
         #dash-link, #profile-link, #landing-link { display: none !important; }
-        /* Переключатель режимов и прогресс-бар не нужны на лендинге */
         #cognee-mode-switcher, #cognee-progress-bar, #cognee-theme-toggle { display: none !important; }
-        /* Подсказки режимов — убираем */
         #cognee-mode-hint { display: none !important; }
-        /* Кнопка паузы — не нужна */
         #pause-trigger-btn, #pause-overlay { display: none !important; }
+
+        /* Кнопки "Объясни иначе" и хроно-уведомления на лендинге не нужны */
+        .explain-btn, #cognee-chrono-notice { display: none !important; }
+
+        /* Закладки не нужны на лендинге */
+        #cognee-bookmark-btn { display: none !important; }
     </style>
 </head>
 <body data-theme="dark">
@@ -368,14 +369,13 @@
 <div class="bg-grid"></div>
 <div class="bg-glow"></div>
 
-<!-- ── NAV с живым КИМ (задача 1.1) ── -->
+<!-- ── NAV с живым КИМ ── -->
 <nav class="nav">
     <a class="nav-logo" href="landing.html">Cognee<span>AI</span></a>
     <div class="nav-sep"></div>
     <a class="nav-link" href="#how">Как работает</a>
     <a class="nav-link" href="#results">Результаты</a>
     <a class="nav-link" href="https://github.com/cogneeAI/CogneeAI" target="_blank" rel="noopener">GitHub</a>
-    <!-- Живой КИМ-индикатор (обновляется реальным sensor.js) -->
     <div class="nav-kim zone-focus" id="nav-kim-badge" title="Когнитивный Индекс Момента — CogneeAI">КИМ: —</div>
     <a class="nav-cta" href="auth.html">Попробовать →</a>
 </nav>
@@ -399,8 +399,6 @@
         <a class="btn-hero btn-primary-hero" href="index.html">🚀 Попробовать демо</a>
         <a class="btn-hero btn-ghost" href="editor.html">✍ Написать статью</a>
     </div>
-
-
 </section>
 
 <!-- ── PROBLEM ── -->
@@ -447,7 +445,8 @@
     </div>
 </section>
 
-<!-- ── HOW IT WORKS (задача 1.1: шаги обёрнуты в para-block) ── -->
+<!-- ── HOW IT WORKS ── -->
+<!-- ВАЖНО: data-no-keywords="true" на .steps-grid запрещает adapter.js выделять слова в карточках -->
 <section id="how">
     <div class="how">
         <div class="reveal">
@@ -455,9 +454,8 @@
             <h2 class="section-title">Три шага<br>адаптации</h2>
         </div>
 
-        <div class="steps-grid reveal">
+        <div class="steps-grid reveal" data-no-keywords="true">
 
-            <!-- Шаг 1 — обёрнут в para-block для живой демонстрации адаптации -->
             <div class="step-card">
                 <span class="step-icon">👁</span>
                 <div class="step-num">Шаг 01</div>
@@ -478,7 +476,6 @@
                 </div>
             </div>
 
-            <!-- Шаг 2 -->
             <div class="step-card">
                 <span class="step-icon">🧠</span>
                 <div class="step-num">Шаг 02</div>
@@ -499,7 +496,6 @@
                 </div>
             </div>
 
-            <!-- Шаг 3 -->
             <div class="step-card">
                 <span class="step-icon">✨</span>
                 <div class="step-num">Шаг 03</div>
@@ -621,17 +617,14 @@
 </footer>
 
 <!--
-    ══════════════════════════════════════════════════════════
-    ПОРЯДОК СКРИПТОВ v9.0 (задача 1.1) — КРИТИЧЕН
-    ══════════════════════════════════════════════════════════
+    ПОРЯДОК СКРИПТОВ v9.1 — КРИТИЧЕН
     1. onnxruntime-web  — инференс ONNX
-    2. config.js        — ключи Supabase + Gemini
-    3. storage.js       — localStorage + AI-кэш
-    4. supabase.js      — авторизация (для синхронизации КИМ)
-    5. gemini.js        — AI-упрощение (нужен для adapter.js)
-    6. sensor.js        — 16 сенсоров + ONNX + КИМ каждые 20 сек
-    7. adapter.js       — адаптация para-block (меняет шаги «Как работает»)
-    ══════════════════════════════════════════════════════════
+    2. config.js        — ключи
+    3. storage.js       — localStorage
+    4. supabase.js      — авторизация
+    5. gemini.js        — AI
+    6. sensor.js        — 16 сенсоров + КИМ
+    7. adapter.js       — адаптация (para-block, без keywords в .steps-grid)
 -->
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
 <script src="config.js" onerror="console.warn('[Cognee landing] config.js не найден')"></script>
@@ -652,9 +645,7 @@
         await CogneeSupabase.init().catch(() => {});
     })();
 
-    // ── Синхронизация живого КИМ с nav-badge (задача 1.1) ─────────────────
-    // adapter.js вызывает window.applyAdaptation(kim) — перехватываем
-    // и дублируем значение в nav-badge
+    // ── Синхронизация живого КИМ с nav-badge ──────────────────────────────
     const navBadge = document.getElementById('nav-kim-badge');
     let lastNavZone = 'focus';
 
@@ -667,8 +658,7 @@
             lastNavZone = zone;
             navBadge.classList.remove('zone-focus', 'zone-normal', 'zone-tired', 'kim-pulse-anim');
             navBadge.classList.add('zone-' + zone);
-            // Перезапуск анимации: убираем и добавляем класс
-            void navBadge.offsetWidth; // reflow
+            void navBadge.offsetWidth; // reflow для перезапуска анимации
             navBadge.classList.add('kim-pulse-anim');
         }
     }
@@ -678,17 +668,15 @@
         updateNavKIM(e.detail.kim);
     });
 
-    // Fallback: если sensor.js уже поставил window.currentKIM — подхватываем
-    if (window.currentKIM !== undefined) updateNavKIM(window.currentKIM);
+    // Fallback если КИМ уже был вычислен до подписки
+    if (typeof window.currentKIM === 'number') updateNavKIM(window.currentKIM);
 
-    // Также патчим window.applyAdaptation чтобы обновлять badge при каждом вызове
+    // Патчим window.applyAdaptation чтобы обновлять badge при каждом вызове
     const _origApply = window.applyAdaptation;
     window.applyAdaptation = function (kim, fromManual) {
         if (typeof kim === 'number') updateNavKIM(kim);
         if (_origApply) _origApply(kim, fromManual);
     };
-
-
 
     // ── Reveal-анимации при скролле ───────────────────────────────────────
     const io = new IntersectionObserver((entries) => {
