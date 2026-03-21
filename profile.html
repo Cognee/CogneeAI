@@ -1,6 +1,12 @@
-<!-- profile.html — v8.5.1 | Глобальная версия: 8.5 -->
-<!-- Изменения v8.5.1: кнопка ⋮ на карточках своих статей (читать/редактировать/удалить).
-     Добавлен article-actions.js. Убраны отдельные кнопки "Редактировать"/"Удалить". -->
+<!-- profile.html — v9.2 | Глобальная версия: 9.2 -->
+<!--
+  Изменения v9.2:
+  - Проверка уникальности имени в реальном времени (debounce 600ms)
+  - Подсказка под полем: ✓ Имя свободно / ✗ Имя занято / ⚠ Зарезервировано
+  - saveProfileName(): async-проверка через CogneeSupabase.checkNameAvailable()
+    перед отправкой — не даёт сохранить занятое имя
+  - Кнопка «Сохранить» неактивна пока имя не проверено или занято
+-->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -94,17 +100,64 @@
         }
         .edit-profile-form.vis { display:block; }
         .edit-field { margin-bottom:14px; }
-        .edit-label { display:block; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); letter-spacing:.06em; margin-bottom:6px; }
-        .edit-input {
-            width:100%; padding:9px 14px; background:rgba(255,255,255,.04);
-            border:1px solid rgba(79,195,247,.15); border-radius:8px; color:var(--text);
-            font-family:'Lora',Georgia,serif; font-size:14px; outline:none; transition:border-color .2s;
+        .edit-label {
+            display:block; font-family:'JetBrains Mono',monospace; font-size:11px;
+            color:var(--muted); letter-spacing:.06em; margin-bottom:6px;
         }
-        .edit-input:focus { border-color:rgba(79,195,247,.5); }
-        .edit-btns { display:flex; gap:10px; }
-        .btn-save-profile { padding:8px 18px; border-radius:8px; font-size:12px; font-family:'JetBrains Mono',monospace; background:rgba(79,195,247,.12); color:var(--accent); border:1px solid rgba(79,195,247,.3); cursor:pointer; transition:background .15s; }
-        .btn-save-profile:hover { background:rgba(79,195,247,.22); }
-        .btn-cancel-edit  { padding:8px 18px; border-radius:8px; font-size:12px; font-family:'JetBrains Mono',monospace; background:none; color:var(--muted); border:1px solid rgba(255,255,255,.1); cursor:pointer; }
+        .edit-input {
+            width:100%; padding:9px 14px;
+            background:rgba(255,255,255,.04);
+            border:1px solid rgba(79,195,247,.15);
+            border-radius:8px; color:var(--text);
+            font-family:'Lora',Georgia,serif; font-size:14px; outline:none;
+            transition:border-color .2s, box-shadow .2s;
+        }
+        .edit-input:focus { border-color:rgba(79,195,247,.5); box-shadow:0 0 0 3px rgba(79,195,247,.08); }
+        .edit-input.name-ok    { border-color: rgba(102,187,106,.5); }
+        .edit-input.name-taken { border-color: rgba(239,83,80,.5); }
+        .edit-input.name-checking { border-color: rgba(255,183,77,.4); }
+
+        /* ── Подсказка под полем имени ── */
+        .name-check-hint {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.03em;
+            min-height: 16px;
+            transition: opacity 0.2s;
+        }
+        .name-check-hint.hidden  { opacity: 0; }
+        .name-check-hint.ok      { color: #66BB6A; }
+        .name-check-hint.taken   { color: #EF5350; }
+        .name-check-hint.warn    { color: #FFB74D; }
+        .name-check-hint.loading { color: var(--muted); }
+
+        .name-char-count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; color: var(--muted);
+            text-align: right; margin-top: 4px;
+        }
+        .name-char-count.warn { color: #FFB74D; }
+
+        .edit-btns { display:flex; gap:10px; margin-top: 4px; }
+        .btn-save-profile {
+            padding:8px 18px; border-radius:8px; font-size:12px;
+            font-family:'JetBrains Mono',monospace;
+            background:rgba(79,195,247,.12); color:var(--accent);
+            border:1px solid rgba(79,195,247,.3); cursor:pointer;
+            transition:background .15s, opacity .15s;
+        }
+        .btn-save-profile:hover:not(:disabled) { background:rgba(79,195,247,.22); }
+        .btn-save-profile:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-cancel-edit  {
+            padding:8px 18px; border-radius:8px; font-size:12px;
+            font-family:'JetBrains Mono',monospace;
+            background:none; color:var(--muted);
+            border:1px solid rgba(255,255,255,.1); cursor:pointer;
+        }
 
         /* СЕКЦИЯ СТАТЕЙ */
         .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
@@ -125,10 +178,7 @@
         }
         .my-article-card:hover { border-color:var(--border2); }
 
-        /* Шапка карточки: заголовок + кнопка ⋮ */
-        .mac-head {
-            display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;
-        }
+        .mac-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:8px; }
         .mac-title {
             font-family:'Unbounded',sans-serif; font-size:14px; font-weight:700;
             letter-spacing:-.02em; flex:1; min-width:0; line-height:1.3;
@@ -147,9 +197,9 @@
             font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 8px;
             border-radius:4px; letter-spacing:.04em;
         }
-        .mac-badge.pub     { background:rgba(102,187,106,.12); color:#66BB6A; border:1px solid rgba(102,187,106,.3); }
-        .mac-badge.priv    { background:rgba(79,195,247,.1); color:var(--accent); border:1px solid rgba(79,195,247,.3); }
-        .mac-badge.draft   { background:rgba(255,183,77,.12); color:var(--warn); border:1px solid rgba(255,183,77,.3); }
+        .mac-badge.pub   { background:rgba(102,187,106,.12); color:#66BB6A; border:1px solid rgba(102,187,106,.3); }
+        .mac-badge.priv  { background:rgba(79,195,247,.1); color:var(--accent); border:1px solid rgba(79,195,247,.3); }
+        .mac-badge.draft { background:rgba(255,183,77,.12); color:var(--warn); border:1px solid rgba(255,183,77,.3); }
 
         /* ПУСТЫЕ СОСТОЯНИЯ */
         .no-articles { text-align:center; padding:60px 20px; background:var(--surface); border:1px dashed var(--border); border-radius:14px; }
@@ -162,7 +212,7 @@
         .spinner { width:32px; height:32px; border:3px solid rgba(79,195,247,.15); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto; }
         @keyframes spin { to { transform:rotate(360deg); } }
 
-        /* ИЗБРАННОЕ СЕКЦИЯ */
+        /* ИЗБРАННОЕ */
         .favorites-section { margin-top:40px; }
 
         @media(max-width:600px){
@@ -184,17 +234,14 @@
 
 <div class="profile-wrap">
 
-    <!-- AUTH GUARD -->
     <div class="auth-guard" id="auth-guard" style="display:none">
         <div class="auth-guard-title">Войдите в аккаунт</div>
         <div class="auth-guard-sub">Профиль доступен только авторизованным пользователям</div>
         <a class="btn-auth" href="auth.html">Войти / Зарегистрироваться</a>
     </div>
 
-    <!-- ОСНОВНОЙ КОНТЕНТ -->
     <div id="profile-content" style="display:none">
 
-        <!-- КАРТОЧКА ПРОФИЛЯ -->
         <div class="profile-card" id="profile-card">
             <div class="profile-avatar" id="profile-avatar">?</div>
             <div class="profile-info">
@@ -203,7 +250,7 @@
             </div>
             <div class="profile-actions">
                 <button class="btn-sm btn-edit-profile" onclick="toggleEditForm()">✏️ Изменить имя</button>
-                <button class="btn-sm btn-logout" onclick="doLogout()">Выйти</button>
+                <button class="btn-sm btn-logout"       onclick="doLogout()">Выйти</button>
             </div>
         </div>
 
@@ -211,10 +258,15 @@
         <div class="edit-profile-form" id="edit-profile-form">
             <div class="edit-field">
                 <label class="edit-label" for="edit-name">Отображаемое имя</label>
-                <input class="edit-input" type="text" id="edit-name" maxlength="50" placeholder="Как тебя называть?">
+                <input class="edit-input" type="text" id="edit-name"
+                       maxlength="30" placeholder="Как тебя называть?"
+                       autocomplete="off" autocorrect="off" spellcheck="false">
+                <!-- Статус проверки уникальности -->
+                <div class="name-check-hint hidden" id="name-check-hint"></div>
+                <div class="name-char-count" id="name-char-count">0 / 30</div>
             </div>
             <div class="edit-btns">
-                <button class="btn-save-profile" onclick="saveProfileName()">Сохранить</button>
+                <button class="btn-save-profile" id="btn-save-name" onclick="saveProfileName()" disabled>Сохранить</button>
                 <button class="btn-cancel-edit"  onclick="toggleEditForm()">Отмена</button>
             </div>
         </div>
@@ -248,11 +300,13 @@
 <script src="supabase.js"></script>
 <script src="article-actions.js"></script>
 <script>
-// profile.js inline — v8.5.1
+// profile.js inline — v9.2
 (function(){
 'use strict';
 
-let _currentUser = null;
+let _currentUser    = null;
+let _nameCheckTimer = null;  // debounce таймер для проверки имени
+let _nameStatus     = null;  // 'ok' | 'taken' | 'warn' | 'loading' | null
 
 window.addEventListener('DOMContentLoaded', async () => {
     CogneeActions.initToastContainer();
@@ -268,6 +322,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     renderProfileCard(_currentUser);
     document.getElementById('profile-content').style.display = 'block';
 
+    // Слушаем ввод имени — проверка уникальности с задержкой
+    const nameInput = document.getElementById('edit-name');
+    nameInput.addEventListener('input', onNameInput);
+
     await Promise.all([loadMyArticles(), loadFavorites()]);
 });
 
@@ -278,25 +336,159 @@ function renderProfileCard(user) {
     document.getElementById('profile-email').textContent = user.email || '';
     document.getElementById('profile-avatar').textContent = name.charAt(0).toUpperCase();
     document.getElementById('edit-name').value = name;
+    document.getElementById('name-char-count').textContent = name.length + ' / 30';
     document.title = name + ' — Cognee';
 }
 
 window.toggleEditForm = function() {
-    document.getElementById('edit-profile-form').classList.toggle('vis');
+    const form = document.getElementById('edit-profile-form');
+    const isOpening = !form.classList.contains('vis');
+    form.classList.toggle('vis');
+
+    if (isOpening) {
+        // При открытии — сбрасываем статус и проверяем текущее имя
+        const nameInput = document.getElementById('edit-name');
+        const currentName = _currentUser?.display_name || '';
+        nameInput.value = currentName;
+        setNameHint('hidden', '');
+        setNameInputState('');
+        document.getElementById('btn-save-name').disabled = true;
+        nameInput.focus();
+    }
 };
+
+// ── LIVE-ПРОВЕРКА ИМЕНИ ───────────────────────────────────────────────────────
+
+function onNameInput() {
+    const input = document.getElementById('edit-name');
+    const value = input.value.trim();
+    const count = input.value.length;
+
+    // Счётчик символов
+    const counter = document.getElementById('name-char-count');
+    counter.textContent = count + ' / 30';
+    counter.className   = 'name-char-count' + (count > 25 ? ' warn' : '');
+
+    // Если имя не изменилось — разрешаем сохранить без проверки
+    if (value === (_currentUser?.display_name || '').trim()) {
+        setNameHint('ok', '✓ Это твоё текущее имя');
+        setNameInputState('ok');
+        document.getElementById('btn-save-name').disabled = false;
+        _nameStatus = 'ok';
+        return;
+    }
+
+    // Базовые проверки без сети
+    if (value.length < 2) {
+        setNameHint('warn', '⚠ Минимум 2 символа');
+        setNameInputState('taken');
+        document.getElementById('btn-save-name').disabled = true;
+        _nameStatus = 'warn';
+        return;
+    }
+
+    // Запускаем debounce-проверку через API
+    clearTimeout(_nameCheckTimer);
+    setNameHint('loading', '⏳ Проверяем доступность…');
+    setNameInputState('checking');
+    document.getElementById('btn-save-name').disabled = true;
+    _nameStatus = 'loading';
+
+    _nameCheckTimer = setTimeout(() => checkNameDebounced(value), 600);
+}
+
+async function checkNameDebounced(name) {
+    if (!window.CogneeSupabase?.checkNameAvailable) return;
+
+    try {
+        const result = await CogneeSupabase.checkNameAvailable(name, _currentUser?.id);
+
+        if (result.available) {
+            setNameHint('ok', '✓ Имя свободно');
+            setNameInputState('ok');
+            document.getElementById('btn-save-name').disabled = false;
+            _nameStatus = 'ok';
+        } else {
+            const msg = result.error || 'Имя недоступно';
+            // Различаем зарезервированные и просто занятые
+            const isReserved = msg.includes('зарезервировано') || msg.includes('reserved');
+            setNameHint(isReserved ? 'warn' : 'taken', '✗ ' + msg);
+            setNameInputState('taken');
+            document.getElementById('btn-save-name').disabled = true;
+            _nameStatus = 'taken';
+        }
+    } catch (e) {
+        // При ошибке сети — разрешаем попытаться (сервер проверит сам)
+        setNameHint('warn', '⚠ Не удалось проверить — попробуй сохранить');
+        setNameInputState('');
+        document.getElementById('btn-save-name').disabled = false;
+        _nameStatus = 'warn';
+    }
+}
+
+function setNameHint(type, text) {
+    const hint = document.getElementById('name-check-hint');
+    hint.textContent = text;
+    hint.className = 'name-check-hint' + (type === 'hidden' ? ' hidden' : ' ' + type);
+}
+
+function setNameInputState(state) {
+    const input = document.getElementById('edit-name');
+    input.classList.remove('name-ok', 'name-taken', 'name-checking');
+    if (state === 'ok')       input.classList.add('name-ok');
+    if (state === 'taken')    input.classList.add('name-taken');
+    if (state === 'checking') input.classList.add('name-checking');
+}
+
+// ── СОХРАНЕНИЕ ИМЕНИ ──────────────────────────────────────────────────────────
 
 window.saveProfileName = async function() {
     const newName = document.getElementById('edit-name').value.trim();
     if (!newName) return;
+
+    const btn = document.getElementById('btn-save-name');
+    btn.disabled    = true;
+    btn.textContent = 'Сохраняем…';
+
     try {
+        // Финальная проверка уникальности перед отправкой
+        // (на случай если пользователь быстро нажал до завершения debounce)
+        if (window.CogneeSupabase?.checkNameAvailable) {
+            const check = await CogneeSupabase.checkNameAvailable(newName, _currentUser?.id);
+            if (!check.available) {
+                setNameHint('taken', '✗ ' + (check.error || 'Имя недоступно'));
+                setNameInputState('taken');
+                btn.disabled    = false;
+                btn.textContent = 'Сохранить';
+                return;
+            }
+        }
+
         await CogneeSupabase.updateProfile({ display_name: newName });
         _currentUser.display_name = newName;
         renderProfileCard(_currentUser);
         document.getElementById('edit-profile-form').classList.remove('vis');
-        CogneeActions.showToast('Имя обновлено', 'ok');
-    } catch(e) {
-        CogneeActions.showToast('Ошибка сохранения', 'err');
+        setNameHint('hidden', '');
+        setNameInputState('');
+        CogneeActions.showToast('✓ Имя обновлено', 'ok');
+    } catch (e) {
+        // Разбираем серверную ошибку
+        const msg = e.message || '';
+        if (msg.includes('name_taken') || msg.includes('уже занято')) {
+            setNameHint('taken', '✗ Это имя уже занято другим пользователем');
+            setNameInputState('taken');
+            CogneeActions.showToast('Имя уже занято', 'err');
+        } else if (msg.includes('reserved_name') || msg.includes('зарезервировано')) {
+            setNameHint('warn', '⚠ Это имя зарезервировано');
+            setNameInputState('taken');
+            CogneeActions.showToast('Имя зарезервировано', 'err');
+        } else {
+            CogneeActions.showToast('Ошибка: ' + msg, 'err');
+        }
     }
+
+    btn.disabled    = false;
+    btn.textContent = 'Сохранить';
 };
 
 window.doLogout = async function() {
@@ -318,13 +510,10 @@ async function loadMyArticles() {
                 </div>`;
             return;
         }
-
         list.innerHTML = '';
         articles.forEach(a => list.appendChild(buildMyCard(a)));
-
     } catch(e) {
         list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px">Ошибка загрузки статей</div>';
-        console.error('[Profile v8.5.1] loadMyArticles:', e);
     }
 }
 
@@ -336,9 +525,8 @@ function buildMyCard(a) {
     const date = a.published_at
         ? new Date(a.published_at).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})
         : '';
-
-    const badgeCls  = a.is_draft ? 'draft' : (a.visibility === 'private' ? 'priv' : 'pub');
-    const badgeTxt  = a.is_draft ? '📝 Черновик' : (a.visibility === 'private' ? '🔒 Приватная' : '🌐 Публичная');
+    const badgeCls = a.is_draft ? 'draft' : (a.visibility === 'private' ? 'priv' : 'pub');
+    const badgeTxt = a.is_draft ? '📝 Черновик' : (a.visibility === 'private' ? '🔒 Приватная' : '🌐 Публичная');
 
     wrap.innerHTML = `
         <div class="mac-head">
@@ -351,7 +539,6 @@ function buildMyCard(a) {
             <span class="mac-badge ${badgeCls}">${badgeTxt}</span>
         </div>`;
 
-    // Монтируем ⋮ с правами владельца
     requestAnimationFrame(() => {
         const target = wrap.querySelector('#mac-act-' + a.id);
         if (!target) return;
@@ -360,7 +547,7 @@ function buildMyCard(a) {
             articleTitle: a.title || 'Статья',
             articleUrl:   'reader.html?id=' + a.id,
             isOwner:      true,
-            noReport:     true,   // Владелец не жалуется на свою статью
+            noReport:     true,
             onDelete:     () => {
                 const card = document.getElementById('my-card-' + a.id);
                 if (card) {
@@ -393,7 +580,7 @@ async function loadFavorites() {
 
         list.innerHTML = '';
         favs.forEach(fav => {
-            const a = fav.articles || {};
+            const a         = fav.articles || {};
             const articleId = fav.article_id;
             if (!articleId) return;
 
@@ -420,13 +607,10 @@ async function loadFavorites() {
                 const target = wrap.querySelector('#fav-act-' + fav.id);
                 if (!target) return;
                 CogneeActions.mountMenu(target, {
-                    articleId:    articleId,
-                    articleTitle: a.title || 'Статья',
-                    articleUrl:   'reader.html?id=' + articleId,
-                    isOwner:      false,
-                    noReport:     false,
-                    onFavChange:  (isFav) => {
-                        // Если убрали из избранного — убираем карточку
+                    articleId, articleTitle: a.title || 'Статья',
+                    articleUrl: 'reader.html?id=' + articleId,
+                    isOwner: false, noReport: false,
+                    onFavChange: (isFav) => {
                         if (!isFav) {
                             wrap.style.transition = 'opacity 0.3s';
                             wrap.style.opacity    = '0';
@@ -438,10 +622,8 @@ async function loadFavorites() {
 
             list.appendChild(wrap);
         });
-
     } catch(e) {
         list.innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px">Ошибка загрузки избранного</div>';
-        console.error('[Profile v8.5.1] loadFavorites:', e);
     }
 }
 

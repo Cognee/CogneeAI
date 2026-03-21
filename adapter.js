@@ -881,8 +881,9 @@
     const CHRONO_KEY = 'cognee_chrono_dismissed';
 
     function initChronoMode() {
-        // Проверяем время суток каждые 5 минут
-        _checkChronoMode();
+        // Задержка первого вызова: показываем уведомление не раньше чем через 10 сек
+        // после загрузки страницы — даём пользователю начать читать
+        setTimeout(_checkChronoMode, 10000);
         setInterval(_checkChronoMode, 5 * 60 * 1000);
     }
 

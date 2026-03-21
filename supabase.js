@@ -1,9 +1,15 @@
-// supabase.js — v8.5.1
-// Файл: supabase.js | Глобальная версия: 8.3.1
-// Исправления v8.5.1:
-//   - БАГ #4: удалена мёртвая переменная _refreshPromise (не использовалась,
-//     конфликтовала по смыслу с _refreshPromise2 — реальным дедупликатором)
-//   - Все остальные функции сохранены без изменений
+// supabase.js — v9.2
+// Файл: supabase.js | Глобальная версия: 9.2
+// Изменения v9.1.1:
+//   - Защита зарезервированных имён: admin, moderator, cognee и др.
+//   - _checkDisplayName(): проверяет имя перед отправкой на сервер
+//   - updateProfile и signUp проверяют display_name на клиенте
+//   - Финальная защита — на сервере (триггер check_display_name_on_change в SQL)
+// v9.2: уникальные имена для всех пользователей
+//   - checkNameAvailable(name, userId): RPC-запрос к is_display_name_available
+//   - updateProfile: async-проверка уникальности перед сохранением
+//   - signUp: async-проверка уникальности при регистрации
+//   - Понятные сообщения об ошибках: "Имя уже занято", "Имя зарезервировано"
 
 (function () {
     'use strict';
@@ -14,13 +20,68 @@
     let currentUser       = null;
     let _isModeratorCache = null;
 
+    // ─── ЗАРЕЗЕРВИРОВАННЫЕ ИМЕНА ────────────────────────────────────────────
+    // Эти имена зарезервированы. Другой пользователь не может их взять.
+    // Текущий владелец (уже сохранено в БД) может оставить своё имя.
+    const _RESERVED_NAMES = new Set([
+        'admin', 'administrator', 'cognee', 'cogneeai', 'moderator',
+        'system', 'support', 'root', 'superuser',
+    ]);
+
+    // Базовая клиентская валидация имени (без сетевого запроса).
+    // Возвращает null если OK, строку ошибки если очевидно плохо.
+    function _checkDisplayName(name) {
+        if (!name) return null;
+        const lower = (name || '').toLowerCase().trim();
+        if (lower.length < 2)  return 'Имя слишком короткое — минимум 2 символа';
+        if (lower.length > 30) return 'Имя слишком длинное — максимум 30 символов';
+        if (_RESERVED_NAMES.has(lower)) {
+            // Разрешаем текущему владельцу оставить то же самое имя
+            if (currentUser && (currentUser.display_name || '').toLowerCase().trim() === lower) return null;
+            return 'Это имя зарезервировано и недоступно';
+        }
+        return null;
+    }
+
+    // Async-проверка: запрашивает у Supabase доступность имени через RPC.
+    // Возвращает { available: bool, error: string|null }.
+    // Используй перед updateProfile/signUp для мгновенной обратной связи.
+    async function checkNameAvailable(name, userId) {
+        // Сначала базовая валидация без сетевого запроса
+        const localErr = _checkDisplayName(name);
+        if (localErr) return { available: false, error: localErr };
+
+        if (!supabaseUrl || !supabaseKey) {
+            // Без соединения с БД не можем проверить уникальность — разрешаем
+            return { available: true, error: null };
+        }
+
+        try {
+            const uid = userId || currentUser?.id || null;
+            const res = await _rpc('is_display_name_available', {
+                p_name:    name.trim(),
+                p_user_id: uid,
+            });
+            // RPC возвращает boolean напрямую
+            const available = res === true || res === 'true';
+            return {
+                available,
+                error: available ? null : 'Это имя уже занято — попробуй другое',
+            };
+        } catch (e) {
+            // При сетевой ошибке не блокируем пользователя — сервер сам проверит
+            console.warn('[CogneeSupabase] checkNameAvailable error:', e.message);
+            return { available: true, error: null };
+        }
+    }
+
     // ─── ИНИЦИАЛИЗАЦИЯ ───────────────────────────────────────────────────────
     async function init() {
         supabaseUrl = window.COGNEE_SUPABASE_URL || null;
         supabaseKey = window.COGNEE_SUPABASE_KEY || null;
 
         if (!supabaseUrl || !supabaseKey) {
-            console.warn('[CogneeSupabase v8.5.1] URL или ключ не заданы — работаем офлайн.');
+            console.warn('[CogneeSupabase v9.2] URL или ключ не заданы — работаем офлайн.');
             return false;
         }
 
@@ -33,7 +94,7 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser    = verified;
-                        console.log('[CogneeSupabase v8.5.1] Сессия восстановлена:', currentUser.email);
+                        console.log('[CogneeSupabase v9.2] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
                         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                         return true;
@@ -44,13 +105,20 @@
             localStorage.removeItem('cognee_session');
         }
 
-        console.log('[CogneeSupabase v8.5.1] Инициализирован. Не авторизован.');
+        console.log('[CogneeSupabase v9.2] Инициализирован. Не авторизован.');
         return false;
     }
 
     // ─── РЕГИСТРАЦИЯ ─────────────────────────────────────────────────────────
     async function signUp(email, password, displayName) {
         _requireConfig();
+
+        // Проверяем имя: зарезервированность + уникальность
+        if (displayName) {
+            const nameCheck = await checkNameAvailable(displayName, null);
+            if (!nameCheck.available) throw new Error(nameCheck.error || 'Имя недоступно');
+        }
+
         const res = await _fetch('/auth/v1/signup', 'POST', {
             email, password,
             data: { display_name: displayName || email.split('@')[0] }
@@ -60,7 +128,7 @@
             _saveSession(res);
             currentUser = _extractUser(res);
             _dispatchAuthEvent('signed_up', currentUser);
-            _upsertProfile().catch(e => console.warn('[CogneeSupabase v8.5.1] upsert on signup:', e.message));
+            _upsertProfile().catch(e => console.warn('[CogneeSupabase] upsert on signup:', e.message));
         }
         return res;
     }
@@ -75,7 +143,7 @@
         _isModeratorCache = null;
         _dispatchAuthEvent('signed_in', currentUser);
         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
-        syncKIMHistory().catch(err => console.warn('[CogneeSupabase v8.5.1] Sync KIM error:', err));
+        syncKIMHistory().catch(err => console.warn('[CogneeSupabase] Sync KIM error:', err));
         return currentUser;
     }
 
@@ -102,6 +170,13 @@
 
     async function updateProfile(data) {
         if (!isAuthenticated()) throw new Error('Не авторизован');
+
+        // Проверяем имя: зарезервированность + уникальность среди всех пользователей
+        if (data.display_name) {
+            const nameCheck = await checkNameAvailable(data.display_name, currentUser?.id);
+            if (!nameCheck.available) throw new Error(nameCheck.error || 'Имя недоступно');
+        }
+
         const patch = {};
         ['display_name'].forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
         const res = await _dbFetch('PATCH',
@@ -216,7 +291,7 @@
         if (!isAuthenticated()) throw new Error('Не авторизован');
 
         await _upsertProfile().catch(e => {
-            console.warn('[CogneeSupabase v8.5.1] upsert before publish:', e.message);
+            console.warn('[CogneeSupabase] upsert before publish:', e.message);
         });
 
         function _makeSlug(n) {
@@ -237,6 +312,8 @@
             content_simple: data.content_simple || null,
             keywords:       Array.isArray(data.keywords) ? data.keywords : [],
             annotation:     data.annotation || null,
+            tags:           Array.isArray(data.tags) ? data.tags : [],
+            recommended_kim: data.recommended_kim || null,
             published_at:   new Date().toISOString(),
             visibility, is_draft, slug,
         };
@@ -246,7 +323,7 @@
 
         if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
         const id = String(res[0].id);
-        console.log('[CogneeSupabase v8.5.1] Статья сохранена. id=' + id + ' slug=' + slug);
+        console.log('[CogneeSupabase] Статья сохранена. id=' + id + ' slug=' + slug);
         return { id, slug };
     }
 
@@ -254,12 +331,12 @@
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
         const patch = {};
-        ['title','content','content_simple','keywords','annotation','visibility','is_draft']
+        ['title','content','content_simple','keywords','annotation','visibility','is_draft','tags','recommended_kim']
             .forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
         if (patch.is_draft === false) patch.published_at = new Date().toISOString();
         await _dbFetch('PATCH',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id, patch);
-        console.log('[CogneeSupabase v8.5.1] Статья ' + id + ' обновлена.');
+        console.log('[CogneeSupabase] Статья ' + id + ' обновлена.');
     }
 
     async function deleteArticle(id) {
@@ -267,7 +344,7 @@
         if (!isAuthenticated()) throw new Error('Не авторизован');
         await _dbFetch('DELETE',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id);
-        console.log('[CogneeSupabase v8.5.1] Статья ' + id + ' удалена.');
+        console.log('[CogneeSupabase] Статья ' + id + ' удалена.');
     }
 
     async function getArticleById(id) {
@@ -280,7 +357,7 @@
                     '/rest/v1/articles?id=eq.' + strId +
                     '&user_id=eq.' + currentUser.id +
                     '&select=id,title,content,content_simple,keywords,annotation,' +
-                    'published_at,user_id,visibility,slug,is_draft,users(display_name)');
+                    'tags,recommended_kim,published_at,user_id,visibility,slug,is_draft,users(display_name)');
                 if (mine && mine[0]) {
                     const a = mine[0];
                     return { ...a, author_name: a.users?.display_name || 'Автор' };
@@ -291,7 +368,7 @@
                 '/rest/v1/articles?id=eq.' + strId +
                 '&visibility=eq.public&is_draft=eq.false' +
                 '&select=id,title,content,content_simple,keywords,annotation,' +
-                'published_at,user_id,visibility,slug,is_draft,users(display_name)');
+                'tags,recommended_kim,published_at,user_id,visibility,slug,is_draft,users(display_name)');
             if (pub && pub[0]) {
                 const a = pub[0];
                 return { ...a, author_name: a.users?.display_name || 'Автор' };
@@ -325,7 +402,7 @@
             '&order=published_at.desc');
         if (Array.isArray(res)) return res;
 
-        console.warn('[CogneeSupabase v8.5.1] Fallback getUserArticlesFull. Примените supabase_migration_v8_4.sql!');
+        console.warn('[CogneeSupabase] Fallback getUserArticlesFull. Примените supabase_migration_v8_4.sql!');
         const fallback = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
             '&select=id,title,annotation,published_at&order=published_at.desc');
@@ -346,7 +423,7 @@
     // ─── HTTP-УТИЛИТЫ ────────────────────────────────────────────────────────
     function _requireConfig() {
         if (!supabaseUrl || !supabaseKey)
-            throw new Error('[CogneeSupabase v8.5.1] Supabase не настроен. Добавь ключи в config.js');
+            throw new Error('[CogneeSupabase] Supabase не настроен. Добавь ключи в config.js');
     }
 
     async function _fetch(path, method, body, withAuth) {
@@ -390,7 +467,7 @@
 
         if (!res.ok && res.status !== 204) {
             const err = await res.json().catch(() => ({}));
-            console.warn('[CogneeSupabase v8.5.1] DB error ' + res.status,
+            console.warn('[CogneeSupabase] DB error ' + res.status,
                 method, path.split('?')[0], err?.message || err?.hint || JSON.stringify(err));
             const e = new Error(err?.message || 'DB error ' + res.status);
             e.code  = err?.code || String(res.status);
@@ -412,7 +489,7 @@
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            console.warn('[CogneeSupabase v8.5.1] RPC ' + fnName + ' error ' + res.status,
+            console.warn('[CogneeSupabase] RPC ' + fnName + ' error ' + res.status,
                 err?.message || err?.hint || JSON.stringify(err));
             const e = new Error(err?.message || 'RPC error ' + res.status);
             e.code  = err?.code || String(res.status);
@@ -432,7 +509,6 @@
         return data?.id ? _extractUser({ user: data }) : null;
     }
 
-    // Единственный промис дедупликации для рефреша
     let _refreshPromise = null;
     async function _refreshToken() {
         if (_refreshPromise) return _refreshPromise;
@@ -443,11 +519,11 @@
                 if (res.error || !res.access_token) { _clearSession(); return false; }
                 _saveSession(res);
                 currentUser = _extractUser(res);
-                console.log('[CogneeSupabase v8.5.1] Токен обновлён');
+                console.log('[CogneeSupabase] Токен обновлён');
                 setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                 return true;
             } catch (e) {
-                console.warn('[CogneeSupabase v8.5.1] Refresh error:', e.message);
+                console.warn('[CogneeSupabase] Refresh error:', e.message);
                 _clearSession();
                 return false;
             } finally {
@@ -502,7 +578,10 @@
         submitReport,
         isModerator, getPendingReports, resolveReport,
         _dbFetch, _rpc,
+        // Проверка доступности имени (async, с RPC запросом к БД)
+        checkNameAvailable,
+        checkDisplayName: _checkDisplayName,
     };
 
-    console.log('[CogneeSupabase v8.5.1] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v9.2] Загружен. Ожидает init().');
 })();

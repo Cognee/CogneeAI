@@ -1,5 +1,10 @@
-<!-- auth.html — v8.2 | Глобальная версия: 8.2 -->
-<!-- Блок 2: Страница авторизации Cognee. Регистрация и вход через Supabase Auth. -->
+<!-- auth.html — v9.2 | Глобальная версия: 9.2 -->
+<!--
+  Изменения v9.2:
+  - Live-проверка уникальности имени при регистрации (debounce 600ms)
+  - Подсказка под полем имени: ✓ Свободно / ✗ Занято / ⚠ Зарезервировано
+  - handleSignUp(): проверяет имя через checkNameAvailable перед отправкой
+-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -7,12 +12,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cognee — Вход</title>
 
-    <!-- Favicon (relative paths для GitHub Pages) -->
     <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg" />
     <link rel="shortcut icon" href="favicon/favicon.ico" />
 
-    <!-- Шрифты -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -28,6 +31,7 @@
             --accent2:  #7C4DFF;
             --error:    #ef5350;
             --success:  #66BB6A;
+            --warn:     #FFB74D;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -50,190 +54,117 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 48px 40px 40px;
-            box-shadow:
-                0 8px 48px rgba(0,0,0,0.6),
-                0 0 80px rgba(79,195,247,0.04);
+            box-shadow: 0 8px 48px rgba(0,0,0,0.6), 0 0 80px rgba(79,195,247,0.04);
         }
 
-        .auth-logo {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-
+        .auth-logo { text-align: center; margin-bottom: 32px; }
         .auth-logo-title {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 28px;
-            font-weight: 600;
+            font-size: 28px; font-weight: 600;
             background: linear-gradient(135deg, #4FC3F7, #7C4DFF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            letter-spacing: -0.02em;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; letter-spacing: -0.02em;
         }
+        .auth-logo-sub { font-size: 13px; color: var(--muted); margin-top: 6px; font-style: italic; }
 
-        .auth-logo-sub {
-            font-size: 13px;
-            color: var(--muted);
-            margin-top: 6px;
-            font-style: italic;
-        }
-
-        /* ─── Таб-переключатель ─── */
-        .auth-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 32px;
-        }
-
+        /* Таб-переключатель */
+        .auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
         .auth-tab {
-            flex: 1;
-            background: none;
-            border: none;
-            color: var(--muted);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            padding: 12px 0;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
+            flex: 1; background: none; border: none; color: var(--muted);
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
+            letter-spacing: 0.04em; padding: 12px 0; cursor: pointer;
+            border-bottom: 2px solid transparent; margin-bottom: -1px;
             transition: color 0.2s ease, border-color 0.2s ease;
         }
+        .auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-        .auth-tab.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-
-        /* ─── Форма ─── */
-        .auth-field {
-            margin-bottom: 20px;
-        }
-
+        /* Поля */
+        .auth-field { margin-bottom: 20px; }
         .auth-label {
-            display: block;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--muted);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin-bottom: 8px;
+            display: block; font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; font-weight: 600; color: var(--muted);
+            letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px;
         }
-
         .auth-input {
-            width: 100%;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: var(--text);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            padding: 12px 16px;
-            outline: none;
+            width: 100%; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+            color: var(--text); font-family: 'JetBrains Mono', monospace;
+            font-size: 14px; padding: 12px 16px; outline: none;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-
         .auth-input:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(79,195,247,0.12);
         }
+        .auth-input::placeholder { color: var(--muted); opacity: 0.6; }
 
-        .auth-input::placeholder {
-            color: var(--muted);
-            opacity: 0.6;
+        /* Состояния поля имени */
+        .auth-input.name-ok       { border-color: rgba(102,187,106,0.5); }
+        .auth-input.name-taken    { border-color: rgba(239,83,80,0.5); }
+        .auth-input.name-checking { border-color: rgba(255,183,77,0.4); }
+
+        /* Подсказка под полем имени */
+        .name-check-hint {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; letter-spacing: 0.03em;
+            min-height: 16px; transition: opacity 0.2s;
         }
+        .name-check-hint.hidden  { opacity: 0; }
+        .name-check-hint.ok      { color: #66BB6A; }
+        .name-check-hint.taken   { color: #EF5350; }
+        .name-check-hint.warn    { color: #FFB74D; }
+        .name-check-hint.loading { color: var(--muted); }
 
-        /* ─── Кнопка ─── */
+        /* Кнопка */
         .auth-btn {
             width: 100%;
             background: linear-gradient(135deg, #4FC3F7, #7C4DFF);
-            border: none;
-            border-radius: 10px;
-            color: #fff;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            padding: 14px;
-            cursor: pointer;
-            margin-top: 8px;
+            border: none; border-radius: 10px; color: #fff;
+            font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            font-weight: 600; letter-spacing: 0.04em; padding: 14px;
+            cursor: pointer; margin-top: 8px;
             transition: opacity 0.2s ease, transform 0.1s ease;
         }
-
         .auth-btn:hover  { opacity: 0.9; }
         .auth-btn:active { transform: scale(0.98); }
-        .auth-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* ─── Сообщения ─── */
+        /* Сообщения */
         .auth-message {
-            margin-top: 16px;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-family: 'JetBrains Mono', monospace;
-            display: none;
+            margin-top: 16px; padding: 10px 16px; border-radius: 8px;
+            font-size: 13px; font-family: 'JetBrains Mono', monospace; display: none;
         }
-
         .auth-message.error {
-            background: rgba(239,83,80,0.12);
-            border: 1px solid rgba(239,83,80,0.3);
-            color: #ef9a9a;
-            display: block;
+            background: rgba(239,83,80,0.12); border: 1px solid rgba(239,83,80,0.3);
+            color: #ef9a9a; display: block;
         }
-
         .auth-message.success {
-            background: rgba(102,187,106,0.12);
-            border: 1px solid rgba(102,187,106,0.3);
-            color: #a5d6a7;
-            display: block;
+            background: rgba(102,187,106,0.12); border: 1px solid rgba(102,187,106,0.3);
+            color: #a5d6a7; display: block;
         }
 
-        /* ─── Ссылка назад ─── */
         .auth-back {
-            display: block;
-            text-align: center;
-            margin-top: 24px;
-            font-size: 13px;
-            color: var(--muted);
-            text-decoration: none;
-            font-family: 'JetBrains Mono', monospace;
+            display: block; text-align: center; margin-top: 24px; font-size: 13px;
+            color: var(--muted); text-decoration: none; font-family: 'JetBrains Mono', monospace;
             transition: color 0.2s ease;
         }
-
         .auth-back:hover { color: var(--accent); }
 
-        /* ─── Состояние загрузки ─── */
         .auth-spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-            vertical-align: middle;
-            margin-right: 8px;
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            vertical-align: middle; margin-right: 8px;
         }
-
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ─── Офлайн-предупреждение ─── */
         #offline-warn {
-            background: rgba(255,183,77,0.12);
-            border: 1px solid rgba(255,183,77,0.3);
-            border-radius: 8px;
-            color: #FFB74D;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            padding: 10px 14px;
-            margin-bottom: 24px;
-            display: none;
-            line-height: 1.6;
+            background: rgba(255,183,77,0.12); border: 1px solid rgba(255,183,77,0.3);
+            border-radius: 8px; color: #FFB74D; font-family: 'JetBrains Mono', monospace;
+            font-size: 12px; padding: 10px 14px; margin-bottom: 24px;
+            display: none; line-height: 1.6;
         }
     </style>
 </head>
@@ -252,7 +183,7 @@
 
     <div class="auth-tabs">
         <button class="auth-tab active" id="tab-signin" onclick="switchTab('signin')">Войти</button>
-        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Регистрация</button>
+        <button class="auth-tab"        id="tab-signup" onclick="switchTab('signup')">Регистрация</button>
     </div>
 
     <!-- Форма входа -->
@@ -273,7 +204,11 @@
     <div id="form-signup" style="display:none">
         <div class="auth-field">
             <label class="auth-label" for="signup-name">Имя (необязательно)</label>
-            <input class="auth-input" id="signup-name" type="text" placeholder="Читатель" autocomplete="name">
+            <input class="auth-input" id="signup-name" type="text"
+                   placeholder="Читатель" autocomplete="name"
+                   maxlength="30" autocorrect="off" spellcheck="false">
+            <!-- Live-подсказка об уникальности -->
+            <div class="name-check-hint hidden" id="signup-name-hint"></div>
         </div>
         <div class="auth-field">
             <label class="auth-label" for="signup-email">Email</label>
@@ -290,118 +225,187 @@
     <a class="auth-back" href="index.html">← Вернуться к чтению</a>
 </div>
 
-<!-- Скрипты: config → supabase -->
 <script src="config.js" onerror="onConfigMissing()"></script>
 <script src="supabase.js"></script>
 <script>
-    // ─── Инициализация ──────────────────────────────────────────────────────
-    (async function () {
-        if (!window.COGNEE_SUPABASE_URL || !window.COGNEE_SUPABASE_KEY) {
-            document.getElementById('offline-warn').style.display = 'block';
-            return;
-        }
-
-        await CogneeSupabase.init();
-
-        // Если уже авторизован — сразу на профиль
-        if (CogneeSupabase.isAuthenticated()) {
-            window.location.href = 'profile.html';
-        }
-    })();
-
-    function onConfigMissing() {
+(async function () {
+    if (!window.COGNEE_SUPABASE_URL || !window.COGNEE_SUPABASE_KEY) {
         document.getElementById('offline-warn').style.display = 'block';
+        return;
     }
 
-    // ─── Переключение вкладок ───────────────────────────────────────────────
-    function switchTab(tab) {
-        const isSignin = (tab === 'signin');
-        document.getElementById('form-signin').style.display = isSignin ? 'block' : 'none';
-        document.getElementById('form-signup').style.display = isSignin ? 'none' : 'block';
-        document.getElementById('tab-signin').classList.toggle('active', isSignin);
-        document.getElementById('tab-signup').classList.toggle('active', !isSignin);
+    await CogneeSupabase.init();
+
+    if (CogneeSupabase.isAuthenticated()) {
+        window.location.href = 'profile.html';
     }
+})();
 
-    // ─── Вход ───────────────────────────────────────────────────────────────
-    async function handleSignIn() {
-        const email    = document.getElementById('signin-email').value.trim();
-        const password = document.getElementById('signin-password').value;
-        const msg      = document.getElementById('signin-msg');
-        const btn      = document.getElementById('signin-btn');
+function onConfigMissing() {
+    document.getElementById('offline-warn').style.display = 'block';
+}
 
-        if (!email || !password) {
-            showMsg(msg, 'Заполни email и пароль', 'error');
-            return;
-        }
+// ── Переключение вкладок ──────────────────────────────────────────────────────
+function switchTab(tab) {
+    const isSignin = (tab === 'signin');
+    document.getElementById('form-signin').style.display = isSignin ? 'block' : 'none';
+    document.getElementById('form-signup').style.display = isSignin ? 'none'  : 'block';
+    document.getElementById('tab-signin').classList.toggle('active',  isSignin);
+    document.getElementById('tab-signup').classList.toggle('active', !isSignin);
+}
 
-        btn.disabled  = true;
-        btn.innerHTML = '<span class="auth-spinner"></span>Входим...';
-        msg.className = 'auth-message';
+// ── Live-проверка имени при регистрации ───────────────────────────────────────
+let _nameTimer = null;
 
-        try {
-            await CogneeSupabase.signIn(email, password);
-            showMsg(msg, '✓ Вход выполнен! Переходим...', 'success');
-            setTimeout(() => window.location.href = 'profile.html', 800);
-        } catch (e) {
-            showMsg(msg, e.message, 'error');
-            btn.disabled  = false;
-            btn.innerHTML = 'Войти';
-        }
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('signup-name');
+    if (nameInput) {
+        nameInput.addEventListener('input', () => {
+            const value = nameInput.value.trim();
 
-    // ─── Регистрация ────────────────────────────────────────────────────────
-    async function handleSignUp() {
-        const name     = document.getElementById('signup-name').value.trim();
-        const email    = document.getElementById('signup-email').value.trim();
-        const password = document.getElementById('signup-password').value;
-        const msg      = document.getElementById('signup-msg');
-        const btn      = document.getElementById('signup-btn');
-
-        if (!email || !password) {
-            showMsg(msg, 'Заполни email и пароль', 'error');
-            return;
-        }
-        if (password.length < 6) {
-            showMsg(msg, 'Пароль — минимум 6 символов', 'error');
-            return;
-        }
-
-        btn.disabled  = true;
-        btn.innerHTML = '<span class="auth-spinner"></span>Создаём аккаунт...';
-        msg.className = 'auth-message';
-
-        try {
-            const res = await CogneeSupabase.signUp(email, password, name);
-
-            // Supabase по умолчанию требует подтверждения email
-            if (res.access_token) {
-                showMsg(msg, '✓ Аккаунт создан! Переходим...', 'success');
-                setTimeout(() => window.location.href = 'profile.html', 800);
-            } else {
-                showMsg(msg, '✓ Проверь почту — мы отправили письмо с подтверждением.', 'success');
-                btn.innerHTML = 'Создать аккаунт';
-                btn.disabled  = false;
+            // Пусто — нет подсказки (имя необязательно)
+            if (!value) {
+                setSignupNameHint('hidden', '');
+                setSignupNameState('');
+                return;
             }
-        } catch (e) {
-            showMsg(msg, e.message, 'error');
-            btn.disabled  = false;
-            btn.innerHTML = 'Создать аккаунт';
+
+            clearTimeout(_nameTimer);
+            setSignupNameHint('loading', '⏳ Проверяем…');
+            setSignupNameState('checking');
+
+            _nameTimer = setTimeout(() => checkSignupName(value), 600);
+        });
+    }
+});
+
+async function checkSignupName(name) {
+    if (!window.CogneeSupabase?.checkNameAvailable) return;
+    try {
+        const result = await CogneeSupabase.checkNameAvailable(name, null);
+        if (result.available) {
+            setSignupNameHint('ok', '✓ Имя свободно');
+            setSignupNameState('ok');
+        } else {
+            const msg      = result.error || 'Имя недоступно';
+            const isReserved = msg.includes('зарезервировано') || msg.includes('reserved');
+            setSignupNameHint(isReserved ? 'warn' : 'taken', '✗ ' + msg);
+            setSignupNameState('taken');
+        }
+    } catch {
+        setSignupNameHint('hidden', '');
+        setSignupNameState('');
+    }
+}
+
+function setSignupNameHint(type, text) {
+    const hint = document.getElementById('signup-name-hint');
+    if (!hint) return;
+    hint.textContent = text;
+    hint.className   = 'name-check-hint' + (type === 'hidden' ? ' hidden' : ' ' + type);
+}
+
+function setSignupNameState(state) {
+    const input = document.getElementById('signup-name');
+    if (!input) return;
+    input.classList.remove('name-ok', 'name-taken', 'name-checking');
+    if (state === 'ok')       input.classList.add('name-ok');
+    if (state === 'taken')    input.classList.add('name-taken');
+    if (state === 'checking') input.classList.add('name-checking');
+}
+
+// ── Вход ──────────────────────────────────────────────────────────────────────
+async function handleSignIn() {
+    const email    = document.getElementById('signin-email').value.trim();
+    const password = document.getElementById('signin-password').value;
+    const msg      = document.getElementById('signin-msg');
+    const btn      = document.getElementById('signin-btn');
+
+    if (!email || !password) { showMsg(msg, 'Заполни email и пароль', 'error'); return; }
+
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="auth-spinner"></span>Входим...';
+    msg.className = 'auth-message';
+
+    try {
+        await CogneeSupabase.signIn(email, password);
+        showMsg(msg, '✓ Вход выполнен! Переходим...', 'success');
+        setTimeout(() => window.location.href = 'profile.html', 800);
+    } catch (e) {
+        showMsg(msg, e.message, 'error');
+        btn.disabled  = false;
+        btn.innerHTML = 'Войти';
+    }
+}
+
+// ── Регистрация ───────────────────────────────────────────────────────────────
+async function handleSignUp() {
+    const name     = document.getElementById('signup-name').value.trim();
+    const email    = document.getElementById('signup-email').value.trim();
+    const password = document.getElementById('signup-password').value;
+    const msg      = document.getElementById('signup-msg');
+    const btn      = document.getElementById('signup-btn');
+
+    if (!email || !password) { showMsg(msg, 'Заполни email и пароль', 'error'); return; }
+    if (password.length < 6) { showMsg(msg, 'Пароль — минимум 6 символов', 'error'); return; }
+
+    // Если имя введено — проверяем уникальность перед отправкой
+    if (name && window.CogneeSupabase?.checkNameAvailable) {
+        const check = await CogneeSupabase.checkNameAvailable(name, null);
+        if (!check.available) {
+            showMsg(msg, check.error || 'Это имя недоступно — выбери другое', 'error');
+            setSignupNameHint('taken', '✗ ' + (check.error || 'Имя недоступно'));
+            setSignupNameState('taken');
+            return;
         }
     }
 
-    // ─── Вспомогательные ────────────────────────────────────────────────────
-    function showMsg(el, text, type) {
-        el.textContent = text;
-        el.className   = 'auth-message ' + type;
-    }
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="auth-spinner"></span>Создаём аккаунт...';
+    msg.className = 'auth-message';
 
-    // Enter для отправки формы
-    document.addEventListener('keydown', e => {
-        if (e.key !== 'Enter') return;
-        const activeTab = document.getElementById('tab-signin').classList.contains('active');
-        if (activeTab) handleSignIn();
-        else           handleSignUp();
-    });
+    try {
+        const res = await CogneeSupabase.signUp(email, password, name || undefined);
+
+        if (res.access_token) {
+            showMsg(msg, '✓ Аккаунт создан! Переходим...', 'success');
+            setTimeout(() => window.location.href = 'profile.html', 800);
+        } else {
+            showMsg(msg, '✓ Проверь почту — мы отправили письмо с подтверждением.', 'success');
+            btn.innerHTML = 'Создать аккаунт';
+            btn.disabled  = false;
+        }
+    } catch (e) {
+        const errMsg = e.message || '';
+        // Читаемые сообщения об ошибках имени
+        if (errMsg.includes('name_taken') || errMsg.includes('уже занято')) {
+            showMsg(msg, 'Это имя уже занято другим пользователем — выбери другое', 'error');
+            setSignupNameHint('taken', '✗ Имя уже занято');
+            setSignupNameState('taken');
+        } else if (errMsg.includes('reserved_name') || errMsg.includes('зарезервировано')) {
+            showMsg(msg, 'Это имя зарезервировано — выбери другое', 'error');
+            setSignupNameHint('warn', '⚠ Имя зарезервировано');
+            setSignupNameState('taken');
+        } else {
+            showMsg(msg, errMsg, 'error');
+        }
+        btn.disabled  = false;
+        btn.innerHTML = 'Создать аккаунт';
+    }
+}
+
+// ── Вспомогательные ───────────────────────────────────────────────────────────
+function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className   = 'auth-message ' + type;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const activeTab = document.getElementById('tab-signin').classList.contains('active');
+    if (activeTab) handleSignIn();
+    else           handleSignUp();
+});
 </script>
 </body>
 </html>
