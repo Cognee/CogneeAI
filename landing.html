@@ -539,10 +539,30 @@ if(typeof window.currentKIM==='number')upKIM(window.currentKIM);
 const _oa=window.applyAdaptation;
 window.applyAdaptation=function(k,f){if(typeof k==='number')upKIM(k);if(_oa)_oa(k,f)};
 
-// Panel live KIM
+// Panel live KIM — реальный КИМ от sensor.js
+// ИСПРАВЛЕНИЕ АУДИТА v9.1: убран Math.random(), добавлена привязка к cognee:kim
 const pv=document.getElementById('panel-kim');
-let pk=72,pd=-1;
-setInterval(()=>{pk+=pd*(Math.random()*2.2+.4);if(pk>86)pd=-1;if(pk<44)pd=1;pk=Math.max(40,Math.min(90,pk));if(pv)pv.textContent=Math.round(pk)},1900);
+function _updatePanelKIM(kim, zone) {
+    if (!pv) return;
+    pv.textContent = Math.round(kim);
+    // Синхронизируем активный chip-режим в панели
+    const chips = document.querySelectorAll('.mode-row .chip');
+    if (chips.length >= 3) {
+        chips.forEach(c => c.classList.remove('on'));
+        const zoneIdx = { focus: 0, normal: 1, tired: 2 };
+        const idx = zoneIdx[zone || 'focus'];
+        if (chips[idx]) chips[idx].classList.add('on');
+    }
+}
+// Слушаем событие от реального sensor.js
+window.addEventListener('cognee:kim', function(e) {
+    _updatePanelKIM(e.detail.kim, e.detail.zone);
+});
+// Инициализируем если КИМ уже известен (повторный визит)
+if (typeof window.currentKIM === 'number') {
+    const _z = window.currentKIM > 70 ? 'focus' : window.currentKIM >= 40 ? 'normal' : 'tired';
+    _updatePanelKIM(window.currentKIM, _z);
+}
 
 // Supabase init
 (async()=>{if(!window.CogneeSupabase||!window.COGNEE_SUPABASE_URL||!window.COGNEE_SUPABASE_KEY)return;await CogneeSupabase.init().catch(()=>{})})();

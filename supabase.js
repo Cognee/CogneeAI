@@ -1,15 +1,10 @@
-// supabase.js — v9.2
-// Файл: supabase.js | Глобальная версия: 9.2
-// Изменения v9.1.1:
-//   - Защита зарезервированных имён: admin, moderator, cognee и др.
-//   - _checkDisplayName(): проверяет имя перед отправкой на сервер
-//   - updateProfile и signUp проверяют display_name на клиенте
-//   - Финальная защита — на сервере (триггер check_display_name_on_change в SQL)
-// v9.2: уникальные имена для всех пользователей
-//   - checkNameAvailable(name, userId): RPC-запрос к is_display_name_available
-//   - updateProfile: async-проверка уникальности перед сохранением
-//   - signUp: async-проверка уникальности при регистрации
-//   - Понятные сообщения об ошибках: "Имя уже занято", "Имя зарезервировано"
+// supabase.js — v9.3
+// Файл: supabase.js | Глобальная версия: 9.3
+// Исправления v9.3 (из аудита):
+//   - БАГ: read_minutes не передавался в publishArticle payload → исправлено
+//   - Добавлен saveFocusMinutes() — для лидерборда (Блок 3, Задача 3.2)
+//   - Добавлен getLeaderboard() — топ по времени в focus
+//   - Остальное: идентично v9.2
 
 (function () {
     'use strict';
@@ -21,55 +16,39 @@
     let _isModeratorCache = null;
 
     // ─── ЗАРЕЗЕРВИРОВАННЫЕ ИМЕНА ────────────────────────────────────────────
-    // Эти имена зарезервированы. Другой пользователь не может их взять.
-    // Текущий владелец (уже сохранено в БД) может оставить своё имя.
     const _RESERVED_NAMES = new Set([
         'admin', 'administrator', 'cognee', 'cogneeai', 'moderator',
         'system', 'support', 'root', 'superuser',
     ]);
 
-    // Базовая клиентская валидация имени (без сетевого запроса).
-    // Возвращает null если OK, строку ошибки если очевидно плохо.
     function _checkDisplayName(name) {
         if (!name) return null;
         const lower = (name || '').toLowerCase().trim();
         if (lower.length < 2)  return 'Имя слишком короткое — минимум 2 символа';
         if (lower.length > 30) return 'Имя слишком длинное — максимум 30 символов';
         if (_RESERVED_NAMES.has(lower)) {
-            // Разрешаем текущему владельцу оставить то же самое имя
             if (currentUser && (currentUser.display_name || '').toLowerCase().trim() === lower) return null;
             return 'Это имя зарезервировано и недоступно';
         }
         return null;
     }
 
-    // Async-проверка: запрашивает у Supabase доступность имени через RPC.
-    // Возвращает { available: bool, error: string|null }.
-    // Используй перед updateProfile/signUp для мгновенной обратной связи.
     async function checkNameAvailable(name, userId) {
-        // Сначала базовая валидация без сетевого запроса
         const localErr = _checkDisplayName(name);
         if (localErr) return { available: false, error: localErr };
-
-        if (!supabaseUrl || !supabaseKey) {
-            // Без соединения с БД не можем проверить уникальность — разрешаем
-            return { available: true, error: null };
-        }
-
+        if (!supabaseUrl || !supabaseKey) return { available: true, error: null };
         try {
             const uid = userId || currentUser?.id || null;
             const res = await _rpc('is_display_name_available', {
                 p_name:    name.trim(),
                 p_user_id: uid,
             });
-            // RPC возвращает boolean напрямую
             const available = res === true || res === 'true';
             return {
                 available,
                 error: available ? null : 'Это имя уже занято — попробуй другое',
             };
         } catch (e) {
-            // При сетевой ошибке не блокируем пользователя — сервер сам проверит
             console.warn('[CogneeSupabase] checkNameAvailable error:', e.message);
             return { available: true, error: null };
         }
@@ -79,12 +58,10 @@
     async function init() {
         supabaseUrl = window.COGNEE_SUPABASE_URL || null;
         supabaseKey = window.COGNEE_SUPABASE_KEY || null;
-
         if (!supabaseUrl || !supabaseKey) {
-            console.warn('[CogneeSupabase v9.2] URL или ключ не заданы — работаем офлайн.');
+            console.warn('[CogneeSupabase v9.3] URL или ключ не заданы — работаем офлайн.');
             return false;
         }
-
         try {
             const stored = localStorage.getItem('cognee_session');
             if (stored) {
@@ -94,7 +71,7 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser    = verified;
-                        console.log('[CogneeSupabase v9.2] Сессия восстановлена:', currentUser.email);
+                        console.log('[CogneeSupabase v9.3] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
                         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                         return true;
@@ -104,21 +81,17 @@
         } catch (e) {
             localStorage.removeItem('cognee_session');
         }
-
-        console.log('[CogneeSupabase v9.2] Инициализирован. Не авторизован.');
+        console.log('[CogneeSupabase v9.3] Инициализирован. Не авторизован.');
         return false;
     }
 
-    // ─── РЕГИСТРАЦИЯ ─────────────────────────────────────────────────────────
+    // ─── AUTH ────────────────────────────────────────────────────────────────
     async function signUp(email, password, displayName) {
         _requireConfig();
-
-        // Проверяем имя: зарезервированность + уникальность
         if (displayName) {
             const nameCheck = await checkNameAvailable(displayName, null);
             if (!nameCheck.available) throw new Error(nameCheck.error || 'Имя недоступно');
         }
-
         const res = await _fetch('/auth/v1/signup', 'POST', {
             email, password,
             data: { display_name: displayName || email.split('@')[0] }
@@ -133,7 +106,6 @@
         return res;
     }
 
-    // ─── ВХОД ────────────────────────────────────────────────────────────────
     async function signIn(email, password) {
         _requireConfig();
         const res = await _fetch('/auth/v1/token?grant_type=password', 'POST', { email, password });
@@ -147,7 +119,6 @@
         return currentUser;
     }
 
-    // ─── ВЫХОД ───────────────────────────────────────────────────────────────
     async function signOut() {
         if (!currentSession) return;
         try { await _fetch('/auth/v1/logout', 'POST', {}, true); } catch (e) {}
@@ -170,13 +141,10 @@
 
     async function updateProfile(data) {
         if (!isAuthenticated()) throw new Error('Не авторизован');
-
-        // Проверяем имя: зарезервированность + уникальность среди всех пользователей
         if (data.display_name) {
             const nameCheck = await checkNameAvailable(data.display_name, currentUser?.id);
             if (!nameCheck.available) throw new Error(nameCheck.error || 'Имя недоступно');
         }
-
         const patch = {};
         ['display_name'].forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
         const res = await _dbFetch('PATCH',
@@ -213,6 +181,70 @@
         };
         await _dbFetch('POST', '/rest/v1/kim_history', [row],
             { 'Prefer': 'resolution=ignore-duplicates,return=minimal' });
+    }
+
+    // ─── ЛИДЕРБОРД — FOCUS MINUTES (Блок 3, Задача 3.2) ─────────────────────
+
+    /**
+     * Сохраняет/добавляет минуты в focus-режиме для текущего пользователя.
+     * Использует RPC add_focus_minutes из supabase_migration_v9_0.sql.
+     */
+    async function saveFocusMinutes(minutes) {
+        if (!isAuthenticated() || !minutes || minutes <= 0) return;
+        try {
+            await _rpc('add_focus_minutes', {
+                p_user_id: currentUser.id,
+                p_minutes: Math.round(minutes),
+            });
+        } catch (e) {
+            console.warn('[CogneeSupabase] saveFocusMinutes:', e.message);
+        }
+    }
+
+    /**
+     * Возвращает топ-20 пользователей по времени в focus-режиме за текущую неделю.
+     */
+    async function getLeaderboard() {
+        _requireConfig();
+        const monday = _getMonday();
+        try {
+            const res = await _dbFetch('GET',
+                '/rest/v1/focus_log' +
+                '?week_start=eq.' + monday +
+                '&select=focus_minutes,user_id,users(display_name)' +
+                '&order=focus_minutes.desc' +
+                '&limit=20');
+            if (!Array.isArray(res)) return [];
+            return res.map(r => ({
+                display_name:  r.users?.display_name || 'Аноним',
+                focus_minutes: r.focus_minutes,
+            }));
+        } catch (e) {
+            console.warn('[CogneeSupabase] getLeaderboard:', e.message);
+            return [];
+        }
+    }
+
+    /** Возвращает место текущего пользователя в лидерборде этой недели */
+    async function getMyLeaderboardEntry() {
+        if (!isAuthenticated()) return null;
+        const monday = _getMonday();
+        try {
+            const res = await _dbFetch('GET',
+                '/rest/v1/focus_log?user_id=eq.' + currentUser.id +
+                '&week_start=eq.' + monday + '&select=focus_minutes');
+            return (Array.isArray(res) && res[0]) ? res[0].focus_minutes : 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function _getMonday() {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        return monday.toISOString().slice(0, 10);
     }
 
     // ─── ИЗБРАННОЕ ───────────────────────────────────────────────────────────
@@ -305,16 +337,18 @@
         const visibility = data.visibility === 'private' ? 'private' : 'public';
         const is_draft   = data.is_draft === true;
 
+        // ── ИСПРАВЛЕНИЕ АУДИТА: read_minutes теперь передаётся в payload ──
         const payload = {
-            user_id:        currentUser.id,
-            title:          data.title,
-            content:        data.content,
-            content_simple: data.content_simple || null,
-            keywords:       Array.isArray(data.keywords) ? data.keywords : [],
-            annotation:     data.annotation || null,
-            tags:           Array.isArray(data.tags) ? data.tags : [],
+            user_id:         currentUser.id,
+            title:           data.title,
+            content:         data.content,
+            content_simple:  data.content_simple || null,
+            keywords:        Array.isArray(data.keywords) ? data.keywords : [],
+            annotation:      data.annotation || null,
+            tags:            Array.isArray(data.tags) ? data.tags : [],
             recommended_kim: data.recommended_kim || null,
-            published_at:   new Date().toISOString(),
+            read_minutes:    data.read_minutes    || null,   // ← ИСПРАВЛЕНО: раньше не передавалось
+            published_at:    new Date().toISOString(),
             visibility, is_draft, slug,
         };
 
@@ -331,7 +365,9 @@
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
         const patch = {};
-        ['title','content','content_simple','keywords','annotation','visibility','is_draft','tags','recommended_kim']
+        // read_minutes добавлен в список разрешённых полей
+        ['title','content','content_simple','keywords','annotation','visibility',
+         'is_draft','tags','recommended_kim','read_minutes']
             .forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
         if (patch.is_draft === false) patch.published_at = new Date().toISOString();
         await _dbFetch('PATCH',
@@ -357,23 +393,21 @@
                     '/rest/v1/articles?id=eq.' + strId +
                     '&user_id=eq.' + currentUser.id +
                     '&select=id,title,content,content_simple,keywords,annotation,' +
-                    'tags,recommended_kim,published_at,user_id,visibility,slug,is_draft,users(display_name)');
+                    'tags,recommended_kim,read_minutes,published_at,user_id,visibility,slug,is_draft,users(display_name)');
                 if (mine && mine[0]) {
                     const a = mine[0];
                     return { ...a, author_name: a.users?.display_name || 'Автор' };
                 }
             }
-
             const pub = await _dbFetch('GET',
                 '/rest/v1/articles?id=eq.' + strId +
                 '&visibility=eq.public&is_draft=eq.false' +
                 '&select=id,title,content,content_simple,keywords,annotation,' +
-                'tags,recommended_kim,published_at,user_id,visibility,slug,is_draft,users(display_name)');
+                'tags,recommended_kim,read_minutes,published_at,user_id,visibility,slug,is_draft,users(display_name)');
             if (pub && pub[0]) {
                 const a = pub[0];
                 return { ...a, author_name: a.users?.display_name || 'Автор' };
             }
-
             return { _private: true };
         }
 
@@ -401,8 +435,6 @@
             '&select=id,title,annotation,published_at,visibility,is_draft,slug' +
             '&order=published_at.desc');
         if (Array.isArray(res)) return res;
-
-        console.warn('[CogneeSupabase] Fallback getUserArticlesFull. Примените supabase_migration_v8_4.sql!');
         const fallback = await _dbFetch('GET',
             '/rest/v1/articles?user_id=eq.' + currentUser.id +
             '&select=id,title,annotation,published_at&order=published_at.desc');
@@ -420,7 +452,7 @@
         return Array.isArray(res) ? res : [];
     }
 
-    // ─── HTTP-УТИЛИТЫ ────────────────────────────────────────────────────────
+    // ─── HTTP ─────────────────────────────────────────────────────────────────
     function _requireConfig() {
         if (!supabaseUrl || !supabaseKey)
             throw new Error('[CogneeSupabase] Supabase не настроен. Добавь ключи в config.js');
@@ -577,11 +609,11 @@
         addFavorite, removeFavorite, isFavorited, getFavorites,
         submitReport,
         isModerator, getPendingReports, resolveReport,
+        saveFocusMinutes, getLeaderboard, getMyLeaderboardEntry,
         _dbFetch, _rpc,
-        // Проверка доступности имени (async, с RPC запросом к БД)
         checkNameAvailable,
         checkDisplayName: _checkDisplayName,
     };
 
-    console.log('[CogneeSupabase v9.2] Загружен. Ожидает init().');
+    console.log('[CogneeSupabase v9.3] Загружен. Ожидает init().');
 })();
