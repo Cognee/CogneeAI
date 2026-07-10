@@ -1,0 +1,16 @@
+# .gitignore — v1.1
+# Cognee · CogneeAI
+
+# config.js коммитится осознанно — в нём нет настоящих секретов
+# (Gemini-ключ идёт через Supabase Edge Function, Supabase anon key публичен по дизайну).
+# Если когда-нибудь понадобится ЛОКАЛЬНО потестировать прямой Gemini-ключ в обход прокси —
+# используй отдельный файл config.local.js и подключай его вручную только у себя,
+# он ниже в списке игнорируемых.
+config.local.js
+
+# Системные и редакторские файлы
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
+node_modules/

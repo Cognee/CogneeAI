@@ -1,18 +1,25 @@
 
-// config.example.js — v8.2
-// Файл: config.example.js | Глобальная версия: 8.2
+// config.example.js — v8.4
+// Файл: config.example.js | Глобальная версия: 8.4
 // ════════════════════════════════════════════════════════════
-// ИНСТРУКЦИЯ:
-// 1. Скопируй этот файл → config.js
-// 2. Заполни свои ключи
-// 3. НЕ КОММИТЬ config.js в Git (он в .gitignore)
+// config.js уже лежит в репозитории и работает «из коробки» —
+// это осознанное решение: секретов в нём нет (см. комментарии в config.js).
+//
+// Этот файл — шаблон на случай, если захочешь подключить СВОЙ проект
+// Supabase вместо готового:
+// 1. Скопируй этот файл → config.js (перезапишет существующий)
+// 2. Впиши URL и anon-ключ своего проекта Supabase
+// 3. COGNEE_GEMINI_KEY оставь пустым — используется прокси через Edge Function
 // ════════════════════════════════════════════════════════════
 
+// ─── Режим отладки ───────────────────────────────────────────
+// true — служебные console.log в консоли браузера, false — тихий режим
+window.COGNEE_DEBUG = false;
+
 // ─── Gemini API ──────────────────────────────────────────────
-// Получи ключ на: https://aistudio.google.com/app/apikey
-// После развёртывания Edge Function этот ключ можно убрать —
-// AI-запросы будут идти через безопасный прокси Supabase.
-window.COGNEE_GEMINI_KEY = 'ВСТАВЬ_СВОЙ_GEMINI_КЛЮЧ';
+// Не используется — все AI-запросы идут через Edge Function-прокси ниже.
+// Заполнять не нужно, оставь пустой строкой.
+window.COGNEE_GEMINI_KEY = '';
 
 // ─── Supabase ────────────────────────────────────────────────
 // Блок 2: создай проект на https://supabase.com
@@ -23,6 +30,4 @@ window.COGNEE_SUPABASE_KEY = 'ТВОЙ_ANON_PUBLIC_KEY';
 // ─── Supabase Edge Function URL ──────────────────────────────
 // После деплоя Edge Function (supabase functions deploy gemini-proxy)
 // URL будет вида: https://ТВОЙ_ПРОЕКТ.supabase.co/functions/v1/gemini-proxy
-// Если задан — gemini.js будет использовать прокси вместо прямого вызова API.
-// Если не задан — работает напрямую через COGNEE_GEMINI_KEY (менее безопасно).
 window.COGNEE_GEMINI_PROXY_URL = 'https://ТВОЙ_ПРОЕКТ.supabase.co/functions/v1/gemini-proxy';
