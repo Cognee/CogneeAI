@@ -1,10 +1,6 @@
-// supabase.js — v9.3
-// Файл: supabase.js | Глобальная версия: 9.3
-// Исправления v9.3 (из аудита):
-//   - БАГ: read_minutes не передавался в publishArticle payload → исправлено
-//   - Добавлен saveFocusMinutes() — для лидерборда (Блок 3, Задача 3.2)
-//   - Добавлен getLeaderboard() — топ по времени в focus
-//   - Остальное: идентично v9.2
+// supabase.js — v9.4
+// Файл: supabase.js | Глобальная версия: 9.4
+// Auth, публикация статей, избранное, модерация, лидерборд по времени в фокусе
 
 (function () {
     'use strict';
@@ -59,7 +55,7 @@
         supabaseUrl = window.COGNEE_SUPABASE_URL || null;
         supabaseKey = window.COGNEE_SUPABASE_KEY || null;
         if (!supabaseUrl || !supabaseKey) {
-            console.warn('[CogneeSupabase v9.3] URL или ключ не заданы — работаем офлайн.');
+            console.warn('[CogneeSupabase v9.4] URL или ключ не заданы — работаем офлайн.');
             return false;
         }
         try {
@@ -71,7 +67,7 @@
                     if (verified) {
                         currentSession = parsed;
                         currentUser    = verified;
-                        console.log('[CogneeSupabase v9.3] Сессия восстановлена:', currentUser.email);
+                        if (window.COGNEE_DEBUG) console.log('[CogneeSupabase v9.4] Сессия восстановлена:', currentUser.email);
                         _dispatchAuthEvent('signed_in', currentUser);
                         setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                         return true;
@@ -81,7 +77,7 @@
         } catch (e) {
             localStorage.removeItem('cognee_session');
         }
-        console.log('[CogneeSupabase v9.3] Инициализирован. Не авторизован.');
+        if (window.COGNEE_DEBUG) console.log('[CogneeSupabase v9.4] Инициализирован. Не авторизован.');
         return false;
     }
 
@@ -337,7 +333,6 @@
         const visibility = data.visibility === 'private' ? 'private' : 'public';
         const is_draft   = data.is_draft === true;
 
-        // ── ИСПРАВЛЕНИЕ АУДИТА: read_minutes теперь передаётся в payload ──
         const payload = {
             user_id:         currentUser.id,
             title:           data.title,
@@ -347,7 +342,7 @@
             annotation:      data.annotation || null,
             tags:            Array.isArray(data.tags) ? data.tags : [],
             recommended_kim: data.recommended_kim || null,
-            read_minutes:    data.read_minutes    || null,   // ← ИСПРАВЛЕНО: раньше не передавалось
+            read_minutes:    data.read_minutes    || null,
             published_at:    new Date().toISOString(),
             visibility, is_draft, slug,
         };
@@ -357,7 +352,7 @@
 
         if (!res || !res[0]) throw new Error('Supabase не вернул ID статьи');
         const id = String(res[0].id);
-        console.log('[CogneeSupabase] Статья сохранена. id=' + id + ' slug=' + slug);
+        if (window.COGNEE_DEBUG) console.log('[CogneeSupabase] Статья сохранена. id=' + id + ' slug=' + slug);
         return { id, slug };
     }
 
@@ -365,14 +360,13 @@
         _requireConfig();
         if (!isAuthenticated()) throw new Error('Не авторизован');
         const patch = {};
-        // read_minutes добавлен в список разрешённых полей
         ['title','content','content_simple','keywords','annotation','visibility',
          'is_draft','tags','recommended_kim','read_minutes']
             .forEach(k => { if (data[k] !== undefined) patch[k] = data[k]; });
         if (patch.is_draft === false) patch.published_at = new Date().toISOString();
         await _dbFetch('PATCH',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id, patch);
-        console.log('[CogneeSupabase] Статья ' + id + ' обновлена.');
+        if (window.COGNEE_DEBUG) console.log('[CogneeSupabase] Статья ' + id + ' обновлена.');
     }
 
     async function deleteArticle(id) {
@@ -380,7 +374,7 @@
         if (!isAuthenticated()) throw new Error('Не авторизован');
         await _dbFetch('DELETE',
             '/rest/v1/articles?id=eq.' + id + '&user_id=eq.' + currentUser.id);
-        console.log('[CogneeSupabase] Статья ' + id + ' удалена.');
+        if (window.COGNEE_DEBUG) console.log('[CogneeSupabase] Статья ' + id + ' удалена.');
     }
 
     async function getArticleById(id) {
@@ -551,7 +545,7 @@
                 if (res.error || !res.access_token) { _clearSession(); return false; }
                 _saveSession(res);
                 currentUser = _extractUser(res);
-                console.log('[CogneeSupabase] Токен обновлён');
+                if (window.COGNEE_DEBUG) console.log('[CogneeSupabase] Токен обновлён');
                 setTimeout(() => _refreshToken(), 50 * 60 * 1000);
                 return true;
             } catch (e) {
@@ -615,5 +609,5 @@
         checkDisplayName: _checkDisplayName,
     };
 
-    console.log('[CogneeSupabase v9.3] Загружен. Ожидает init().');
+    if (window.COGNEE_DEBUG) console.log('[CogneeSupabase v9.4] Загружен. Ожидает init().');
 })();

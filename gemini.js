@@ -1,5 +1,5 @@
-// gemini.js — v9.1
-// Файл: gemini.js | Глобальная версия: 9.1
+// gemini.js — v9.2
+// Файл: gemini.js | Глобальная версия: 9.2
 // Блок 2:
 //   - Задача 2.1: добавлена функция rephraseText(text) — "Объясни иначе"
 //   - Задача 2.3: добавлена функция generateTags(text) — AI-теги и рекомендуемый КИМ
@@ -307,5 +307,5 @@
         generateTags,
     };
 
-    console.log('[CogneeAI gemini.js v9.1] Загружен. Транспорт:', _getStatusLabel());
+    if (window.COGNEE_DEBUG) console.log('[CogneeAI gemini.js v9.2] Загружен. Транспорт:', _getStatusLabel());
 })();

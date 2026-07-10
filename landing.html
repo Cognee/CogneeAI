@@ -1,3 +1,4 @@
+<!-- landing.html — v9.3 | Глобальная версия: 9.3 -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -378,7 +379,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
             <div>
               <div class="step-num">Шаг 01</div>
               <div class="step-h">Сенсор поведения</div>
-              <div class="step-d">16 сигналов: скорость скролла, паузы, перечитывания, фокус на абзаце. Без камеры.</div>
+              <p class="step-d">16 сигналов: скорость скролла, паузы, перечитывания, фокус на абзаце. Без камеры.</p>
               <div class="tags"><span class="tag">Vanilla JS</span><span class="tag">16 features</span><span class="tag">Privacy-first</span></div>
             </div>
           </div>
@@ -387,7 +388,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
             <div>
               <div class="step-num">Шаг 02</div>
               <div class="step-h">CogneeAI нейросеть</div>
-              <div class="step-d">SimpleRNN работает прямо в браузере через ONNX Runtime. Вычисляет КИМ 0–100. Данные не покидают устройство.</div>
+              <p class="step-d">SimpleRNN работает прямо в браузере через ONNX Runtime. Вычисляет КИМ 0–100. Данные не покидают устройство.</p>
               <div class="tags"><span class="tag">ONNX Runtime Web</span><span class="tag">SimpleRNN</span></div>
             </div>
           </div>
@@ -396,7 +397,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
             <div>
               <div class="step-num">Шаг 03</div>
               <div class="step-h">AI-адаптация текста</div>
-              <div class="step-d">Gemini 2.0 Flash создаёт упрощённые версии абзацев. При КИМ &lt; 40 — плавно подаётся простой текст.</div>
+              <p class="step-d">Gemini 2.0 Flash создаёт упрощённые версии абзацев. При КИМ &lt; 40 — плавно подаётся простой текст.</p>
               <div class="tags"><span class="tag">Gemini 2.0 Flash</span><span class="tag">Кэш в localStorage</span></div>
             </div>
           </div>
@@ -539,8 +540,7 @@ if(typeof window.currentKIM==='number')upKIM(window.currentKIM);
 const _oa=window.applyAdaptation;
 window.applyAdaptation=function(k,f){if(typeof k==='number')upKIM(k);if(_oa)_oa(k,f)};
 
-// Panel live KIM — реальный КИМ от sensor.js
-// ИСПРАВЛЕНИЕ АУДИТА v9.1: убран Math.random(), добавлена привязка к cognee:kim
+// Panel live KIM — реальный КИМ от sensor.js, привязка к событию cognee:kim
 const pv=document.getElementById('panel-kim');
 function _updatePanelKIM(kim, zone) {
     if (!pv) return;

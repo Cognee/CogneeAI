@@ -1,5 +1,5 @@
-// sensor.js — v9.1
-// Файл: sensor.js | Глобальная версия: 9.1
+// sensor.js — v9.2
+// Файл: sensor.js | Глобальная версия: 9.2
 // Блок 2:
 //   - Задача 2.1: детекция застревания на абзаце (>35 сек без скролла вперёд)
 //     → диспатч события cognee:paragraph_struggle
@@ -119,7 +119,7 @@
             detail: { block: closestBlock, dwellSec: paragraphDwellSec }
         }));
 
-        console.log('[CogneeAI sensor] Застревание на абзаце:', paragraphDwellSec.toFixed(1), 'сек');
+        if (window.COGNEE_DEBUG) console.log('[CogneeAI sensor] Застревание на абзаце:', paragraphDwellSec.toFixed(1), 'сек');
     }
 
     // ─── ЗАДАЧА 2.4: КИМ-снапшот для умных закладок ──────────────────────────
@@ -254,12 +254,14 @@
             };
 
             const kim = proba[0]*95 + proba[1]*65 + proba[2]*25 + proba[3]*35 + proba[4]*10;
-            console.log(
-                `[CogneeAI 🧠] flow:${(proba[0]*100).toFixed(1)}%` +
-                ` normal:${(proba[1]*100).toFixed(1)}%` +
-                ` tired:${(proba[2]*100).toFixed(1)}%` +
-                ` → КИМ:${kim.toFixed(1)} (${elapsed.toFixed(2)}мс)`
-            );
+            if (window.COGNEE_DEBUG) {
+                console.log(
+                    `[CogneeAI 🧠] flow:${(proba[0]*100).toFixed(1)}%` +
+                    ` normal:${(proba[1]*100).toFixed(1)}%` +
+                    ` tired:${(proba[2]*100).toFixed(1)}%` +
+                    ` → КИМ:${kim.toFixed(1)} (${elapsed.toFixed(2)}мс)`
+                );
+            }
             return kim;
         } catch (err) {
             console.warn('[CogneeAI] Ошибка инференса:', err.message);
@@ -330,7 +332,7 @@
             );
             await onnxSession.run({ [onnxSession.inputNames[0]]: dummy });
             modelLoadSuccess = true;
-            console.log(`[CogneeAI] ✅ ONNX загружена за ${Math.round(performance.now() - t0)}мс`);
+            if (window.COGNEE_DEBUG) console.log(`[CogneeAI] ✅ ONNX загружена за ${Math.round(performance.now() - t0)}мс`);
             updateNeuralBadge('ready');
         } catch (err) {
             onnxSession      = null;

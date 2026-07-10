@@ -1,10 +1,6 @@
-// article-actions.js — v8.5.1
-// Файл: article-actions.js | Глобальная версия: 8.3.1
-// Исправления v8.5.1:
-//   - Убрана кнопка «Поделиться в Telegram» (t.me/share)
-//   - БАГ #8: исправлена гонка условий при монтировании меню через requestAnimationFrame —
-//     добавлена проверка наличия DOM-элемента перед монтированием
-//   - Остальная логика сохранена полностью
+// article-actions.js — v8.5.2
+// Файл: article-actions.js | Глобальная версия: 8.5.2
+// Действия над статьёй: меню публикации, шаринг, избранное
 
 (function () {
     'use strict';
@@ -378,7 +374,7 @@
         _ensureReportModal();
         _ensureConfirmModal();
 
-        // ИСПРАВЛЕНИЕ БАГ #8: проверяем что triggerEl ещё в DOM перед монтированием
+        // Проверяем что triggerEl ещё в DOM перед монтированием
         if (!triggerEl || !document.body.contains(triggerEl)) return null;
 
         const btn = document.createElement('button');
@@ -554,5 +550,5 @@
 
     window.CogneeActions = { mountMenu, showToast, initToastContainer };
 
-    console.log('[CogneeActions v8.5.1] Загружен.');
+    if (window.COGNEE_DEBUG) console.log('[CogneeActions v8.5.2] Загружен.');
 })();

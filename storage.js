@@ -1,6 +1,6 @@
 
-// storage.js — v8.3
-// Файл: storage.js | Глобальная версия: 8.3
+// storage.js — v8.4
+// Файл: storage.js | Глобальная версия: 8.4
 // Хранение истории КИМ в localStorage между сессиями.
 // Блок 1 (v8.1): добавлен кэш AI-упрощений и AI-ключевых слов (экономия лимитов Gemini Flash).
 // Экспортирует window.CogneeStorage = { saveKIM, getHistory, getHourlyStats, getDailyStats, getBestHour, getWorstHour, saveSimplified, getSimplified, saveKeywords, getKeywords }
@@ -215,5 +215,5 @@
         getKeywords,
     };
 
-    console.log('[CogneeStorage v8.1] Загружен. Записей в истории:', _load().length);
+    if (window.COGNEE_DEBUG) console.log('[CogneeStorage v8.4] Загружен. Записей в истории:', _load().length);
 })();
