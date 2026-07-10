@@ -1,10 +1,7 @@
-// config.js — v1.0
-// Файл: config.js | Глобальная версия: 9.4
-// ════════════════════════════════════════════════════════════
 // Этот файл коммитится в репозиторий и раздаётся вместе с сайтом
 // на GitHub Pages — так устроен статический хостинг.
 //
-// Здесь НЕТ настоящих секретов:
+// Здесь нет настоящих секретов:
 // - COGNEE_SUPABASE_KEY — это публичный anon-ключ Supabase,
 //   он специально предназначен для использования в браузере.
 //   Защита данных обеспечивается RLS-политиками в базе, не секретностью ключа.
@@ -16,14 +13,6 @@
 // ─── Режим отладки ───────────────────────────────────────────
 window.COGNEE_DEBUG = false;
 
-// ─── Gemini API ──────────────────────────────────────────────
-// Прямой ключ не используется — все запросы идут через прокси ниже.
-// Оставляем пустым намеренно.
-window.COGNEE_GEMINI_KEY = '';
-
-// ─── Supabase ────────────────────────────────────────────────
-window.COGNEE_SUPABASE_URL = 'https://ТВОЙ_ПРОЕКТ.supabase.co';
-window.COGNEE_SUPABASE_KEY = 'ТВОЙ_ANON_PUBLIC_KEY';
-
-// ─── Supabase Edge Function (безопасный прокси для Gemini) ──
-window.COGNEE_GEMINI_PROXY_URL = 'https://ТВОЙ_ПРОЕКТ.supabase.co/functions/v1/gemini-proxy';
+window.COGNEE_SUPABASE_URL = 'https://lwhvvketuaordqylidfc.supabase.co';
+window.COGNEE_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3aHZ2a2V0dWFvcmRxeWxpZGZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMzg5MzIsImV4cCI6MjA4ODkxNDkzMn0.Sof0GLAzk86Nn6mnx1hbVgZn_rBQJXAkgtBjVSsWjLo';
+window.COGNEE_GEMINI_PROXY_URL = 'https://lwhvvketuaordqylidfc.supabase.co/functions/v1/gemini-proxy';
