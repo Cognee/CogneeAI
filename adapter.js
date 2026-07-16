@@ -39,7 +39,7 @@
         const oldBtn = document.getElementById('pause-btn');
         if (oldBtn) oldBtn.remove();
 
-        initProgressBar();
+        //initProgressBar();
         initPauseOverlay();
         initModeSwitcher();
         initThemeToggle();
