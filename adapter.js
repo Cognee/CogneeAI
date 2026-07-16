@@ -70,7 +70,7 @@
     window.exitPause = finishPause;
 
     // ─── ПРОГРЕСС-БАР ────────────────────────────────────────────────────────
-    function initProgressBar() {
+    /* function initProgressBar() {
         const bar = document.createElement('div');
         bar.id = 'cognee-progress-bar';
         bar.style.cssText = `
@@ -82,13 +82,13 @@
         document.body.appendChild(bar);
     }
 
-    function updateProgressBar() {
+   function updateProgressBar() {
         const bar = document.getElementById('cognee-progress-bar');
         if (!bar) return;
         const docH = document.documentElement.scrollHeight - window.innerHeight;
         if (docH <= 0) { bar.style.height = '0%'; return; }
         bar.style.height = Math.min(100, (window.scrollY / docH) * 100) + '%';
-    }
+    }*/
 
     // ─── ПОЛНОЭКРАННЫЙ ОВЕРЛЕЙ ПАУЗЫ ─────────────────────────────────────────
     function initPauseOverlay() {
