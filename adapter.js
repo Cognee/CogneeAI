@@ -45,7 +45,7 @@
         initThemeToggle();
         highlightKeywords();
         setupScrollWatcher();
-        updateProgressBar();
+        //updateProgressBar();
 
         // Слушаем событие застревания от sensor.js
         document.addEventListener('cognee:paragraph_struggle', onParagraphStruggle);
@@ -260,7 +260,7 @@
             if (scrollRAF) return;
             scrollRAF = requestAnimationFrame(() => {
                 scrollRAF = null;
-                updateProgressBar();
+                //updateProgressBar();
                 if (lastMode) updateContentByScroll(lastMode);
                 if (document.body.classList.contains('mode-tired')) {
                     highlightClosestParagraph();
