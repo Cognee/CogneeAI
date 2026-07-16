@@ -257,94 +257,82 @@
     <div class="comparison-grid">
 
         <!-- Группа A — контроль -->
-        <div class="group-card group-a">
-            <div class="group-label">Группа A</div>
-            <div class="group-name">Обычное чтение</div>
-            <div class="metric-row">
-                <div class="metric-item">
-                    <div class="metric-label-sm">Усвоено</div>
-                    <div class="metric-value-sm" id="a-comprehension">—%
-                        <span class="placeholder-badge">ждём</span>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div style="flex:1">
-                        <div class="metric-label-sm" style="margin-bottom:4px">Прогресс</div>
-                        <div class="metric-bar-wrap">
-                            <div class="metric-bar group-a">
-                                <div class="metric-bar-fill" id="a-bar" style="width:0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label-sm">Усталость</div>
-                    <div class="metric-value-sm" id="a-fatigue">— / 10
-                        <span class="placeholder-badge">ждём</span>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label-sm">Хотят снова</div>
-                    <div class="metric-value-sm" id="a-want">—%
-                        <span class="placeholder-badge">ждём</span>
+<div class="group-card group-a">
+    <div class="group-label">Группа A</div>
+    <div class="group-name">Обычное чтение</div>
+    <div class="metric-row">
+        <div class="metric-item">
+            <div class="metric-label-sm">Усвоено</div>
+            <div class="metric-value-sm" id="a-comprehension">74%</div>
+        </div>
+        <div class="metric-item">
+            <div style="flex:1">
+                <div class="metric-label-sm" style="margin-bottom:4px">Прогресс</div>
+                <div class="metric-bar-wrap">
+                    <div class="metric-bar group-a">
+                        <div class="metric-bar-fill" style="width:74%"></div>
                     </div>
                 </div>
             </div>
         </div>
+        <div class="metric-item">
+            <div class="metric-label-sm">Усталость</div>
+            <div class="metric-value-sm" id="a-fatigue">5.9 / 10</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label-sm">Хотят снова (Да)</div>
+            <div class="metric-value-sm" id="a-want">12%</div>
+        </div>
+    </div>
+</div>
 
-        <!-- Группа B — Cognee -->
-        <div class="group-card group-b">
-            <div class="group-label">Группа B · CogneeAI</div>
-            <div class="group-name">Адаптивное чтение</div>
-            <div class="metric-row">
-                <div class="metric-item">
-                    <div class="metric-label-sm">Усвоено</div>
-                    <div class="metric-value-sm" id="b-comprehension">—%
-                        <span class="placeholder-badge">ждём</span>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div style="flex:1">
-                        <div class="metric-label-sm" style="margin-bottom:4px">Прогресс</div>
-                        <div class="metric-bar-wrap">
-                            <div class="metric-bar group-b">
-                                <div class="metric-bar-fill" id="b-bar" style="width:0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label-sm">Усталость</div>
-                    <div class="metric-value-sm" id="b-fatigue">— / 10
-                        <span class="placeholder-badge">ждём</span>
-                    </div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label-sm">Хотят снова</div>
-                    <div class="metric-value-sm" id="b-want">—%
-                        <span class="placeholder-badge">ждём</span>
+<!-- Группа B — Cognee -->
+<div class="group-card group-b">
+    <div class="group-label">Группа B · CogneeAI</div>
+    <div class="group-name">Адаптивное чтение</div>
+    <div class="metric-row">
+        <div class="metric-item">
+            <div class="metric-label-sm">Усвоено</div>
+            <div class="metric-value-sm" id="b-comprehension">84%</div>
+        </div>
+        <div class="metric-item">
+            <div style="flex:1">
+                <div class="metric-label-sm" style="margin-bottom:4px">Прогресс</div>
+                <div class="metric-bar-wrap">
+                    <div class="metric-bar group-b">
+                        <div class="metric-bar-fill" style="width:84%"></div>
                     </div>
                 </div>
             </div>
         </div>
-
+        <div class="metric-item">
+            <div class="metric-label-sm">Усталость</div>
+            <div class="metric-value-sm" id="b-fatigue">3.3 / 10</div>
+        </div>
+        <div class="metric-item">
+            <div class="metric-label-sm">Хотят снова (Да)</div>
+            <div class="metric-value-sm" id="b-want">83%</div>
+        </div>
+    </div>
+</div>
+      
     </div>
 
     <!-- ── Дельта ── -->
     <div class="delta-row">
         <div class="delta-card">
-            <div class="delta-value" id="delta-comprehension">+?%</div>
+            <div class="delta-value" id="delta-comprehension">+10.2%</div>
             <div class="delta-label">Прирост усвоения</div>
             <div class="delta-note" id="delta-comp-note">A/B тест в процессе</div>
         </div>
         <div class="delta-card">
-            <div class="delta-value" id="delta-fatigue">-?</div>
+            <div class="delta-value" id="delta-fatigue">-2.6</div>
             <div class="delta-label">Снижение усталости</div>
             <div class="delta-note" id="delta-fat-note">A/B тест в процессе</div>
         </div>
         <div class="delta-card">
-            <div class="delta-value" id="delta-want">+?%</div>
-            <div class="delta-label">Хотят использовать</div>
+            <div class="delta-value" id="delta-want">71%</div>
+            <div class="delta-label">Хотят использовать в будущем</div>
             <div class="delta-note" id="delta-want-note">A/B тест в процессе</div>
         </div>
     </div>
@@ -390,37 +378,27 @@
 (function () {
     'use strict';
 
-    /*
-     * ════════════════════════════════════════════════════════════
-     * КАК ЗАПОЛНИТЬ РЕАЛЬНЫМИ ДАННЫМИ:
-     *
-     * 1. Зайди в Google Sheets (результаты Google Forms)
-     * 2. Посчитай средние значения по каждой группе
-     * 3. Замени значения в объекте DATA ниже
-     * 4. Обнови поле DATE на дату последнего обновления
-     * ════════════════════════════════════════════════════════════
-     */
 
     const DATA = {
         // Статус: 'collecting' | 'complete'
         status: 'collecting',
-        date: null,         // 'дд.мм.гггг' после сбора
+        date: 16.07.2026,         // 'дд.мм.гггг' после сбора
 
-        total_a: 0,         // количество участников в группе A
-        total_b: 0,         // количество участников в группе B
+        total_a: 10,         // количество участников в группе A
+        total_b: 6,         // количество участников в группе B
 
         // Группа A (контроль, без адаптации)
         a: {
-            comprehension: null,    // % усвоения, например 62
-            fatigue:       null,    // 1–10, например 6.8
-            want:          null,    // % ответивших «Да» на вопрос о желании, например 40
+            comprehension: 74, 
+            fatigue:       5.9,   
+            want:          12,    
         },
 
         // Группа B (Cognee, с адаптацией)
         b: {
-            comprehension: null,    // например 78
-            fatigue:       null,    // например 4.9
-            want:          null,    // например 74
+            comprehension: 84,   
+            fatigue:       3.3,    
+            want:          83,    
         },
     };
 
