@@ -22,7 +22,7 @@
   --ease:cubic-bezier(.16,1,.3,1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:hidden;width:100%}
 body{font-family:var(--fb);background:var(--ink);color:var(--t1);overflow-x:hidden;-webkit-font-smoothing:antialiased}
 a{text-decoration:none;color:inherit}
 button{cursor:pointer;font-family:inherit}
@@ -47,13 +47,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
 .nav-logo-icon{width:34px;height:34px;border-radius:9px;overflow:hidden;box-shadow:0 0 22px rgba(56,200,248,.26),inset 0 1px 0 rgba(255,255,255,.12);flex-shrink:0}
 .nav-logo-icon img{width:100%;height:100%;object-fit:cover}
 .nav-logo-text{font-family:var(--fd);font-weight:800;font-size:18px;letter-spacing:-.04em;color:var(--t1)}
-.nav-kim{display:flex;align-items:center;gap:7px;margin-left:12px;padding:4px 11px;background:rgba(56,200,248,.07);border:1px solid rgba(56,200,248,.2);border-radius:20px;font-family:var(--fm);font-size:11px;font-weight:600;color:var(--c);letter-spacing:.06em;transition:all .5s;white-space:nowrap}
-.nav-kim-dot{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c);animation:blink 2s ease-in-out infinite;flex-shrink:0}
 @keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.28;transform:scale(.62)}}
-.nav-kim.zone-normal{color:var(--g);border-color:rgba(62,232,160,.22);background:rgba(62,232,160,.07)}
-.nav-kim.zone-normal .nav-kim-dot{background:var(--g);box-shadow:0 0 6px var(--g)}
-.nav-kim.zone-tired{color:var(--a);border-color:rgba(247,201,72,.22);background:rgba(247,201,72,.07)}
-.nav-kim.zone-tired .nav-kim-dot{background:var(--a);box-shadow:0 0 6px var(--a)}
 .nav-sp{flex:1}
 .nav-links{display:flex;align-items:center;gap:2px}
 .nav-lnk{padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;color:var(--t2);transition:color .2s,background .2s}
@@ -171,8 +165,6 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
 .panel-logo-ver{font-family:var(--fm);font-size:10px;color:var(--t3);margin-left:2px}
 .ptitle{font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:18px}
 .panel-reader{background:rgba(3,5,11,.58);border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,.055);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);margin-bottom:14px}
-.panel-kim-badge{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:20px;background:rgba(56,200,248,.09);border:1px solid rgba(56,200,248,.22);font-family:var(--fm);font-size:11px;font-weight:700;color:var(--c);letter-spacing:.05em;margin-bottom:16px}
-.pkimdot{width:5px;height:5px;border-radius:50%;background:var(--c);box-shadow:0 0 5px var(--c);animation:blink 1.5s ease-in-out infinite;flex-shrink:0}
 .plines{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
 .pl{height:9px;border-radius:5px;background:linear-gradient(90deg,rgba(255,255,255,.07),rgba(255,255,255,.04));position:relative;overflow:hidden}
 .pl::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);transform:translateX(-100%);animation:scan 3.2s ease-in-out infinite}
@@ -286,7 +278,6 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
       <div class="nav-logo-icon"><img src="favicon/favicon.svg" alt="Cognee"></div>
       <span class="nav-logo-text">Cognee</span>
     </a>
-    <div class="nav-kim zone-focus" id="nav-kim-badge"><span class="nav-kim-dot"></span>КИМ: —</div>
     <div class="nav-sp"></div>
     <nav class="nav-links">
       <a class="nav-lnk" href="#how">Как работает</a>
@@ -295,7 +286,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
     </nav>
     <div class="nav-actions">
       <a href="auth.html" class="btn-ghost">Войти</a>
-      <a href="index.html" class="btn-primary">Попробовать →</a>
+      <a href="reader.html?id=1" class="btn-primary">Попробовать →</a>
     </div>
     <button class="ham" id="ham-btn" aria-label="Меню">☰</button>
   </nav>
@@ -306,7 +297,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
     <a class="mob-lnk" href="editor.html">Написать статью</a>
     <div class="mob-sep"></div>
     <a class="mob-lnk" href="auth.html">Войти</a>
-    <a class="mob-prim" href="index.html">Попробовать →</a>
+    <a class="mob-prim" href="reader.html?id=1">Попробовать →</a>
   </div>
 </header>
 
@@ -321,7 +312,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
   </h1>
   <p class="hero-sub">Нейросеть анализирует 16 сигналов поведения и адаптирует каждый абзац под твоё когнитивное состояние. Без камеры. Без анкеты.</p>
   <div class="hero-cta">
-    <a href="index.html" class="cta-main">🚀 Попробовать демо</a>
+    <a href="reader.html?id=1" class="cta-main">🚀 Попробовать демо</a>
     <a href="auth.html" class="cta-sec">Создать аккаунт</a>
   </div>
   <div class="hero-stats">
@@ -413,7 +404,6 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
           </div>
           <div class="ptitle">Читалка · Текущий сеанс</div>
           <div class="panel-reader">
-            <div class="panel-kim-badge"><span class="pkimdot"></span>КИМ: <span id="panel-kim">72</span> · Фокус 🧠</div>
             <div class="plines">
               <div class="pl" style="width:100%"></div>
               <div class="pl" style="width:88%"></div>
@@ -481,7 +471,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
     <h2 class="cta-t">Начни читать<br>умнее сегодня</h2>
     <p class="cta-s">Попробуй демо прямо сейчас — без регистрации. Или создай аккаунт и публикуй статьи с CogneeAI адаптацией.</p>
     <div class="cta-acts">
-      <a href="index.html" class="cta-main">🚀 Попробовать демо</a>
+      <a href="reader.html?id=1" class="cta-main">🚀 Попробовать демо</a>
       <a href="auth.html" class="cta-sec">Создать аккаунт</a>
     </div>
   </div>
@@ -494,7 +484,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
       <div class="flogo-icon"><img src="favicon/favicon.svg" alt="Cognee"></div>Cognee
     </a>
     <nav class="flinks">
-      <a class="flnk" href="index.html">Демо</a>
+      <a class="flnk" href="reader.html?id=1">Демо</a>
       <a class="flnk" href="catalog.html">Каталог</a>
       <a class="flnk" href="editor.html">Редактор</a>
       <a class="flnk" href="results.html">A/B тест</a>
@@ -506,11 +496,7 @@ footer{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.05);pa
 </footer>
 
 <script src="config.js" onerror="void 0"></script>
-<script src="storage.js" onerror="void 0"></script>
 <script src="supabase.js" onerror="void 0"></script>
-<script src="gemini.js" onerror="void 0"></script>
-<script src="sensor.js" onerror="void 0"></script>
-<script src="adapter.js" onerror="void 0"></script>
 <script>
 (function(){
 'use strict';
@@ -530,39 +516,6 @@ function draw(){
 }
 rsz();mkPts();draw();
 window.addEventListener('resize',()=>{rsz();mkPts()},{passive:true});
-
-// KIM nav
-const nb=document.getElementById('nav-kim-badge');
-let lz='focus';
-function upKIM(k){if(!nb)return;const z=k>70?'focus':k>=40?'normal':'tired';const L={focus:'Фокус',normal:'Норма',tired:'Устал'};nb.innerHTML=`<span class="nav-kim-dot"></span>КИМ: ${Math.round(k)} · ${L[z]}`;if(z!==lz){lz=z;nb.className=`nav-kim zone-${z}`}}
-window.addEventListener('cognee:kim',e=>upKIM(e.detail.kim));
-if(typeof window.currentKIM==='number')upKIM(window.currentKIM);
-const _oa=window.applyAdaptation;
-window.applyAdaptation=function(k,f){if(typeof k==='number')upKIM(k);if(_oa)_oa(k,f)};
-
-// Panel live KIM — реальный КИМ от sensor.js, привязка к событию cognee:kim
-const pv=document.getElementById('panel-kim');
-function _updatePanelKIM(kim, zone) {
-    if (!pv) return;
-    pv.textContent = Math.round(kim);
-    // Синхронизируем активный chip-режим в панели
-    const chips = document.querySelectorAll('.mode-row .chip');
-    if (chips.length >= 3) {
-        chips.forEach(c => c.classList.remove('on'));
-        const zoneIdx = { focus: 0, normal: 1, tired: 2 };
-        const idx = zoneIdx[zone || 'focus'];
-        if (chips[idx]) chips[idx].classList.add('on');
-    }
-}
-// Слушаем событие от реального sensor.js
-window.addEventListener('cognee:kim', function(e) {
-    _updatePanelKIM(e.detail.kim, e.detail.zone);
-});
-// Инициализируем если КИМ уже известен (повторный визит)
-if (typeof window.currentKIM === 'number') {
-    const _z = window.currentKIM > 70 ? 'focus' : window.currentKIM >= 40 ? 'normal' : 'tired';
-    _updatePanelKIM(window.currentKIM, _z);
-}
 
 // Supabase init
 (async()=>{if(!window.CogneeSupabase||!window.COGNEE_SUPABASE_URL||!window.COGNEE_SUPABASE_KEY)return;await CogneeSupabase.init().catch(()=>{})})();

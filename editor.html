@@ -1,5 +1,5 @@
 <!-- editor.html — v9.1 | Глобальная версия: 9.1 -->
-<!-- Блок 2, Задача 2.3: generateTags + recommended_kim в processWithAI и publishArticle -->
+<!-- Редактор статей: черновики, AI-обработка, публикация -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -329,7 +329,7 @@
 <body>
 
 <nav class="nav">
-    <a class="nav-logo" href="index.html">Cognee</a>
+    <a class="nav-logo" href="landing.html">Cognee</a>
     <div class="nav-sep"></div>
     <a class="nav-link" href="catalog.html">📚 Каталог</a>
     <a class="nav-link" href="profile.html">Профиль</a>
@@ -648,7 +648,7 @@ function _saveDraftLocal(title, content) {
     } catch(e) { showToast('Ошибка сохранения'); }
 }
 
-// ─── AI ОБРАБОТКА (задача 2.3: добавлен шаг generateTags) ───────────────────
+// ─── AI ОБРАБОТКА ─────────────────────────────────────────────────────────────
 window.processWithAI = async function() {
     const title   = document.getElementById('title-input').value.trim();
     const content = document.getElementById('content-area').value.trim();
@@ -696,7 +696,7 @@ window.processWithAI = async function() {
         S.annotation = annotation;
         setStep('step-annotation', 'done');
 
-        // 4. Задача 2.3: Теги и рекомендуемый КИМ
+        // Теги и рекомендуемый КИМ
         setStep('step-tags', 'active');
         const tagsData = await window.CogneeAI.generateTags(content);
         S.tags            = tagsData.tags            || [];
@@ -724,7 +724,7 @@ function showAIResults(annotation, _keywords, simplifiedCount, tags, recommended
     document.getElementById('res-simplified-count').textContent =
         simplifiedCount > 0 ? `Упрощено абзацев: ${simplifiedCount}` : 'Упрощение не выполнено';
 
-    // Задача 2.3: отображаем теги
+    // Отображаем теги
     const tagsList = document.getElementById('res-tags-list');
     tagsList.innerHTML = '';
     if (tags && tags.length > 0) {
@@ -751,7 +751,7 @@ function showAIResults(annotation, _keywords, simplifiedCount, tags, recommended
     document.getElementById('ai-idle').style.display = 'none';
 }
 
-// ─── ПУБЛИКАЦИЯ (задача 2.3: передаём tags и recommended_kim) ────────────────
+// ─── ПУБЛИКАЦИЯ ───────────────────────────────────────────────────────────────
 window.doPublish = async function() {
     const title   = document.getElementById('title-input').value.trim();
     const content = document.getElementById('content-area').value.trim();

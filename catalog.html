@@ -1,5 +1,5 @@
 <!-- catalog.html — v9.1 | Глобальная версия: 9.1 -->
-<!-- Блок 2, Задача 2.3: отображение тегов на карточках статей -->
+<!-- Каталог публичных статей: поиск, фильтры, теги -->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -108,7 +108,7 @@
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
 
-        /* Теги на карточке (задача 2.3) */
+        /* Теги на карточке */
         .article-card-tags {
             display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
         }
@@ -162,7 +162,7 @@
 <body>
 
 <nav class="nav">
-    <a class="nav-logo" href="index.html">Cognee</a>
+    <a class="nav-logo" href="landing.html">Cognee</a>
     <div class="nav-sep"></div>
     <a class="nav-link active" href="catalog.html">📚 Каталог</a>
     <a class="nav-link" href="editor.html">+ Написать</a>
@@ -318,7 +318,7 @@ window.loadMore = function() {
     if (_hasMore && !_loading) loadArticles(false);
 };
 
-// ── КАРТОЧКА (задача 2.3: добавлены теги) ────────────────────────────────────
+// ── КАРТОЧКА СТАТЬИ ───────────────────────────────────────────────────────────
 function buildCard(article) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'position:relative';

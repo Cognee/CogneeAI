@@ -225,7 +225,7 @@
 <body data-theme="dark">
 
 <nav class="nav">
-    <a class="nav-logo" href="index.html">Cognee</a>
+    <a class="nav-logo" href="landing.html">Cognee</a>
     <div class="nav-sep"></div>
     <a class="nav-link" href="catalog.html">📚 Каталог</a>
     <a class="nav-link" href="editor.html">+ Написать</a>
@@ -492,7 +492,7 @@ window.saveProfileName = async function() {
 };
 
 window.doLogout = async function() {
-    try { await CogneeSupabase.signOut(); } finally { location.href = 'index.html'; }
+    try { await CogneeSupabase.signOut(); } finally { location.href = 'landing.html'; }
 };
 
 // ── МОИ СТАТЬИ ────────────────────────────────────────────────────────────────

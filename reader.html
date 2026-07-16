@@ -1,8 +1,7 @@
 <!-- reader.html — v9.1 | Глобальная версия: 9.1 -->
 <!--
-  Блок 2:
-  - Задача 2.2: адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
-  - Задача 2.3: деликатный баннер если КИМ < recommended_kim - 10
+  Адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
+  Деликатный баннер если КИМ < recommended_kim - 10
 -->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
@@ -33,10 +32,7 @@
             font-family: 'Unbounded', sans-serif; font-size: 14px; font-weight: 700;
             color: #4FC3F7; text-decoration: none; letter-spacing: -0.02em; flex-shrink: 0;
         }
-        .reader-nav-title {
-            font-size: 13px; color: var(--muted, #5a7090); font-style: italic;
-            flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
-        }
+        .reader-nav-spacer { flex: 1; min-width: 0; }
         .reader-nav-link {
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted, #5a7090); text-decoration: none;
@@ -67,7 +63,7 @@
             padding: 2px 8px; letter-spacing: 0.04em;
         }
 
-        /* Баннер рекомендуемого КИМ (задача 2.3) */
+        /* Баннер рекомендуемого КИМ */
         #kim-recommend-banner {
             display: none;
             max-width: var(--reader-max); margin: 16px auto 0; padding: 0 24px;
@@ -86,7 +82,31 @@
         }
         .kim-banner-close:hover { color: #a0b8d0; }
 
-        /* Адаптивный таймер (задача 2.2) */
+        /* Баннер "продолжить с места, где остановились" */
+        #resume-banner {
+            display: none;
+            max-width: var(--reader-max); margin: 16px auto 0; padding: 0 24px;
+        }
+        .resume-banner-inner {
+            background: rgba(79,195,247,0.07);
+            border: 1px solid rgba(79,195,247,0.25);
+            border-left: 3px solid #4FC3F7;
+            border-radius: 8px; padding: 10px 14px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            color: #8fb8d6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .resume-banner-go {
+            background: #4FC3F7; color: #0D1117; border: none; border-radius: 6px;
+            padding: 5px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            font-weight: 700; cursor: pointer;
+        }
+        .resume-banner-close {
+            margin-left: auto; background: none; border: none;
+            color: #5a7090; cursor: pointer; font-size: 16px; padding: 0;
+        }
+        .resume-banner-close:hover { color: #a0b8d0; }
+
+        /* Адаптивный таймер */
         #read-time-left {
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted,#5a7090); cursor: default;
@@ -134,8 +154,8 @@
     <div class="read-progress" id="read-progress"></div>
 
     <nav class="reader-nav">
-        <a class="reader-nav-logo" href="index.html">Cognee</a>
-        <span class="reader-nav-title" id="nav-title">Загрузка...</span>
+        <a class="reader-nav-logo" href="landing.html">Cognee</a>
+        <div class="reader-nav-spacer"></div>
         <a class="reader-nav-link" href="catalog.html">📚 Каталог</a>
         <a class="reader-nav-link" href="editor.html">+ Написать</a>
         <div id="nav-actions-wrap"></div>
@@ -150,7 +170,7 @@
         <span class="error-icon">📭</span>
         <div class="error-title">Статья не найдена</div>
         <div class="error-sub">Возможно, ссылка устарела или статья была удалена</div>
-        <a class="btn-back" href="index.html">← На главную</a>
+        <a class="btn-back" href="landing.html">← На главную</a>
         <a class="btn-catalog" href="catalog.html">📚 Каталог</a>
     </div>
 
@@ -162,16 +182,26 @@
             💡 Если у тебя есть ссылка вида <strong>reader.html?id=s3ihe7hl</strong> — открой её напрямую.<br>
             Числовой ID приватных статей не работает намеренно.
         </div>
-        <a class="btn-back" href="index.html">← На главную</a>
+        <a class="btn-back" href="landing.html">← На главную</a>
         <a class="btn-catalog" href="catalog.html">📚 Каталог</a>
     </div>
 
-    <!-- Баннер рекомендуемого КИМ (задача 2.3) -->
+    <!-- Баннер рекомендуемого КИМ -->
     <div id="kim-recommend-banner">
         <div class="kim-banner-inner" id="kim-banner-inner">
             <span>🧠</span>
             <span id="kim-banner-text"></span>
             <button class="kim-banner-close" id="kim-banner-close" title="Закрыть">×</button>
+        </div>
+    </div>
+
+    <!-- Баннер "продолжить с места, где остановились" -->
+    <div id="resume-banner">
+        <div class="resume-banner-inner">
+            <span>📖</span>
+            <span id="resume-banner-text"></span>
+            <button class="resume-banner-go" id="resume-banner-go">Перейти</button>
+            <button class="resume-banner-close" id="resume-banner-close" title="Закрыть">×</button>
         </div>
     </div>
 
@@ -183,11 +213,11 @@
             <span class="meta-item" id="meta-author"></span>
             <span class="meta-item" id="meta-date"></span>
             <span class="meta-item" id="meta-read"></span>
-            <!-- Задача 2.2: адаптивный таймер -->
+            <!-- Адаптивный таймер чтения -->
             <span class="meta-item" id="read-time-left"></span>
             <span class="vis-badge" id="meta-vis-badge" style="display:none"></span>
         </div>
-        <!-- Задача 2.3: теги -->
+        <!-- Теги статьи -->
         <div class="article-tags" id="article-tags"></div>
     </div>
 
@@ -224,10 +254,13 @@
             _currentArticle = article;
             renderArticle(article);
 
-            // Задача 2.2: запускаем адаптивный таймер
+            // Предлагаем вернуться к месту, где остановились в прошлый раз
+            checkResumePosition(article);
+
+            // Запускаем адаптивный таймер чтения
             initReadingTimer(article);
 
-            // Задача 2.3: показываем баннер если КИМ ниже рекомендуемого
+            // Показываем баннер если КИМ ниже рекомендуемого
             checkKIMRecommendation(article);
 
             const me      = CogneeSupabase.getCurrentUser();
@@ -249,7 +282,6 @@
 
     function renderArticle(a) {
         document.title = a.title + ' — Cognee';
-        document.getElementById('nav-title').textContent   = a.title;
         document.getElementById('meta-title').textContent  = a.title;
         document.getElementById('meta-author').textContent = '✍ ' + (a.author_name || 'Автор');
         document.getElementById('meta-date').textContent   =
@@ -268,7 +300,7 @@
             el.textContent = '🔒 приватная'; el.style.display = 'inline-block';
         }
 
-        // Задача 2.3: показываем теги
+        // Показываем теги
         if (a.tags && a.tags.length > 0) {
             const tagsEl = document.getElementById('article-tags');
             a.tags.forEach(tag => {
@@ -371,6 +403,40 @@
         });
     }
 
+    // ─── "Продолжить с места, где остановились" ──────────────────────────────
+    function checkResumePosition(article) {
+        if (!window.CogneeBookmarks) return;
+        const bm = window.CogneeBookmarks.get(article.id);
+        if (!bm || typeof bm.scrollPct !== 'number') return;
+        // Не показываем баннер для самого начала и почти завершённого чтения
+        if (bm.scrollPct < 5 || bm.scrollPct > 95) return;
+
+        const banner = document.getElementById('resume-banner');
+        const textEl = document.getElementById('resume-banner-text');
+        const goBtn  = document.getElementById('resume-banner-go');
+        const closeBtn = document.getElementById('resume-banner-close');
+        if (!banner || !textEl) return;
+
+        textEl.textContent = bm.context
+            ? `Продолжить с ${bm.scrollPct}% · «${bm.context}»?`
+            : `Продолжить с ${bm.scrollPct}%, где вы остановились?`;
+
+        banner.style.display = 'block';
+
+        goBtn.addEventListener('click', () => {
+            const target = (document.documentElement.scrollHeight - window.innerHeight) * (bm.scrollPct / 100);
+            window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+            banner.style.display = 'none';
+        });
+
+        closeBtn.addEventListener('click', () => {
+            banner.style.display = 'none';
+        });
+
+        // Автоматически скрываем через 15 сек, если не нажали
+        setTimeout(() => { banner.style.display = 'none'; }, 15000);
+    }
+
     // ─── Markdown → HTML ──────────────────────────────────────────────────────
     function mdToHtml(text) {
         return text.split(/\n\s*\n/).map(b => {
@@ -389,12 +455,10 @@
     function showError() {
         document.getElementById('loading-state').style.display = 'none';
         document.getElementById('error-state').style.display   = 'block';
-        document.getElementById('nav-title').textContent = 'Статья не найдена';
     }
     function showPrivate() {
         document.getElementById('loading-state').style.display  = 'none';
         document.getElementById('private-state').style.display  = 'block';
-        document.getElementById('nav-title').textContent = 'Приватная статья';
         document.title = 'Закрытая статья — Cognee';
     }
     })();

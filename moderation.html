@@ -214,7 +214,7 @@
 
     <!-- HEADER -->
     <header class="mod-header">
-        <a class="mod-logo" href="index.html">Cognee</a>
+        <a class="mod-logo" href="landing.html">Cognee</a>
         <span class="mod-title-badge">🛡 МОДЕРАЦИЯ</span>
         <span class="mod-user" id="mod-user-email"></span>
         <button class="mod-logout-btn" onclick="doLogout()">Выйти</button>
@@ -440,7 +440,7 @@
         try {
             await CogneeSupabase.signOut();
         } finally {
-            location.href = 'index.html';
+            location.href = 'landing.html';
         }
     };
 
@@ -451,7 +451,7 @@
                 <span class="access-denied-icon">🔒</span>
                 <div class="access-denied-title">Доступ запрещён</div>
                 <div class="access-denied-sub">${escHtml(msg)}</div>
-                <a href="index.html" style="color:#4FC3F7;font-size:14px;">← На главную</a>
+                <a href="landing.html" style="color:#4FC3F7;font-size:14px;">← На главную</a>
             </div>
         `;
     }

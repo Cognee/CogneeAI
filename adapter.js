@@ -1,4 +1,7 @@
-// adapter.js — v1.0
+// adapter.js — v9.1
+// Файл: adapter.js | Глобальная версия: 9.1
+// Движок адаптации: переключение режимов, «Объясни иначе», умные закладки, хронорежим
+
 (function () {
 
     // ─── КОНСТАНТЫ РЕЖИМОВ ────────────────────────────────────────────────────
@@ -45,13 +48,13 @@
         setupScrollWatcher();
         updateProgressBar();
 
-        // слушаем событие застревания от sensor.js
+        // Слушаем событие застревания от sensor.js
         document.addEventListener('cognee:paragraph_struggle', onParagraphStruggle);
 
-        // инициализация умных закладок
+        // Умные закладки
         initBookmarks();
 
-        // хронорежим
+        // Хронорежим
         initChronoMode();
 
         if (window.currentKIM !== undefined) {
@@ -296,9 +299,6 @@
         lastMode = newMode;
 
         updateKIMDisplay(kim);
-
-        // обновляем КИМ в умных закладках при каждой смене
-        _refreshBookmarkKIMHint();
     }
 
     // ─── ЛОГИКА ВЕРСИЙ АБЗАЦЕВ ────────────────────────────────────────────────
@@ -668,7 +668,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    // "Объясни иначе"
+    // ЗАДАЧА 2.1: "Объясни иначе"
     // ═══════════════════════════════════════════════════════════
 
     // Множество блоков, на которых кнопка уже показана
@@ -762,7 +762,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  Умные Хронорежим
+    // ЗАДАЧА 2.4: Умные закладки с КИМ-снапшотом
     // ═══════════════════════════════════════════════════════════
 
     const BOOKMARKS_KEY = 'cognee_bookmarks';
@@ -774,7 +774,7 @@
         // Добавляем кнопку закладки в интерфейс
         const btn = document.createElement('button');
         btn.id    = 'cognee-bookmark-btn';
-        btn.title = 'Добавить умную закладку (запомнит КИМ и позицию)';
+        btn.title = 'Добавить закладку (запомнит место в статье)';
         btn.style.cssText = `
             position:fixed; top:192px; right:20px;
             background:var(--kim-bg,#0a1020);
@@ -802,12 +802,6 @@
     }
 
     function addBookmark() {
-        const snapshot = window.CogneeBookmarks?.getKIMSnapshot?.() || {
-            kim: Math.round(window.currentKIM || 70),
-            zone: 'normal',
-            ts: Date.now(),
-        };
-
         // Определяем позицию и контекст
         const scrollPct = document.documentElement.scrollHeight > 0
             ? Math.round(window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100)
@@ -821,25 +815,20 @@
             if (rect.top < window.innerHeight / 2) context = h.textContent.trim().slice(0, 60);
         });
 
-        const bookmark = {
-            id:        Date.now(),
-            url:       location.href,
-            title:     document.title,
-            scrollPct,
-            context,
-            kim:       snapshot.kim,
-            zone:      snapshot.zone,
-            ts:        snapshot.ts,
-        };
-
+        const key = _getArticleKey();
         try {
             const bookmarks = _loadBookmarks();
-            bookmarks.unshift(bookmark);
-            if (bookmarks.length > 50) bookmarks.pop();
+            bookmarks[key] = {
+                url:   location.href,
+                title: document.title,
+                scrollPct,
+                context,
+                ts:    Date.now(),
+            };
             localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
         } catch (e) {}
 
-        showAIStatus('🔖 Закладка сохранена · КИМ ' + snapshot.kim + ' · ' + scrollPct + '%');
+        showAIStatus('🔖 Закладка сохранена · ' + scrollPct + '%');
         hideAIStatus(2500);
         _renderBookmarkTooltip();
     }
@@ -847,8 +836,17 @@
     function _loadBookmarks() {
         try {
             const raw = localStorage.getItem(BOOKMARKS_KEY);
-            return raw ? JSON.parse(raw) : [];
-        } catch { return []; }
+            if (!raw) return {};
+            const parsed = JSON.parse(raw);
+            // Старый формат (плоский массив) — сбрасываем на новый формат "по статье"
+            if (Array.isArray(parsed)) return {};
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch { return {}; }
+    }
+
+    function _getArticleKey() {
+        const id = new URLSearchParams(location.search).get('id');
+        return id || location.pathname;
     }
 
     function _renderBookmarkTooltip() {
@@ -857,17 +855,16 @@
         if (old) old.remove();
     }
 
-    function _refreshBookmarkKIMHint() {
-        // Обновляем подсказку на кнопке закладки
-        const btn = document.getElementById('cognee-bookmark-btn');
-        if (!btn) return;
-        const zone  = getZone(window.currentKIM || 70);
-        const color = zone === 'focus' ? '#4FC3F7' : zone === 'normal' ? '#81C784' : '#FFB74D';
-        btn.style.borderColor = color + '55';
-    }
+    // ─── Публичный доступ к позиции чтения (для баннера "продолжить с места") ──
+    window.CogneeBookmarks = {
+        get(articleId) {
+            const bookmarks = _loadBookmarks();
+            return bookmarks[String(articleId)] || null;
+        },
+    };
 
     // ═══════════════════════════════════════════════════════════
-    // Хронорежимим — деликатные напоминания
+    // Хронорежим — деликатные напоминания
     // ═══════════════════════════════════════════════════════════
 
     const CHRONO_KEY = 'cognee_chrono_dismissed';

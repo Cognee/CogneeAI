@@ -69,10 +69,10 @@ cp config.example.js config.js
 # Заполни COGNEE_SUPABASE_URL и COGNEE_SUPABASE_KEY
 
 # 3. Открой в браузере
-open index.html
+open landing.html
 # или используй Live Server в VS Code
 
-# 4. Читай статью 2+ минуты
+# 4. Жми "Попробовать демо" — статья-пример читается через reader.html?id=1
 # 5. Открой dashboard.html для просмотра КИМ-профиля
 ```
 
@@ -88,17 +88,15 @@ open index.html
 
 ```
 CogneeAI/
-├── index.html          ← Демо-читалка с адаптацией
-├── landing.html        ← Публичный лендинг
-├── reader.html         ← Читалка статей из каталога
+├── index.html          ← Редирект на landing.html (нужен для GitHub Pages: отдаётся по корневому URL)
+├── landing.html        ← Публичный лендинг (главная страница проекта)
+├── reader.html         ← Читалка статей (включая демо-статью id=1)
 ├── editor.html         ← Редактор с AI-обработкой
 ├── catalog.html        ← Каталог публичных статей
 ├── profile.html        ← Личный кабинет
 ├── auth.html           ← Вход / регистрация
 ├── dashboard.html      ← Хронокогнитивный профиль
 ├── results.html        ← Результаты A/B теста
-├── presenter.html      ← Режим докладчика (питч-фича)
-├── audience.html       ← Страница для жюри (телефон)
 ├── sensor.js           ← 16 поведенческих сенсоров + ONNX
 ├── adapter.js          ← Движок адаптации + AI-фичи
 ├── gemini.js           ← Клиент Gemini через Edge Function

@@ -1,8 +1,6 @@
 // gemini.js — v9.2
 // Файл: gemini.js | Глобальная версия: 9.2
-// Блок 2:
-//   - Задача 2.1: добавлена функция rephraseText(text) — "Объясни иначе"
-//   - Задача 2.3: добавлена функция generateTags(text) — AI-теги и рекомендуемый КИМ
+// Клиент Gemini через Edge Function: упрощение текста, перефраз, теги, аннотация
 
 (function () {
     'use strict';
@@ -248,7 +246,7 @@
         }
     }
 
-    // ─── Задача 2.1: "Объясни иначе" ─────────────────────────────────────────
+    // ─── "Объясни иначе" ──────────────────────────────────────────────────────
     async function rephraseText(text) {
         const hash   = textHash('rephrase_' + text);
         const cached = window.CogneeStorage?.getSimplified('reph_' + hash);
@@ -268,7 +266,7 @@
         }
     }
 
-    // ─── Задача 2.3: AI-теги и рекомендуемый КИМ ─────────────────────────────
+    // ─── AI-теги и рекомендуемый КИМ ──────────────────────────────────────────
     async function generateTags(text) {
         const hash = textHash('tags_' + text.slice(0, 200));
         try {

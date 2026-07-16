@@ -1,9 +1,6 @@
 // sensor.js — v9.2
 // Файл: sensor.js | Глобальная версия: 9.2
-// Блок 2:
-//   - Задача 2.1: детекция застревания на абзаце (>35 сек без скролла вперёд)
-//     → диспатч события cognee:paragraph_struggle
-//   - Задача 2.4: КИМ-снапшоты для умных закладок (window.CogneeBookmarks.snapshot)
+// 16 поведенческих сенсоров, ONNX-инференс, детекция застревания, снапшоты для закладок
 
 (function () {
     if (window.__sensorsInitialized) return;
@@ -17,7 +14,7 @@
     const MODEL_PATH             = 'model/cognee_ai.onnx';
     const FEATURE_SIZE           = 16;
 
-    // Задача 2.1: порог застревания (мс)
+    // Порог застревания на абзаце (мс)
     const STRUGGLE_THRESHOLD_MS  = 35000;
 
     // ─── БАЗОВЫЕ СЧЁТЧИКИ ─────────────────────────────────────────────────────
@@ -121,18 +118,6 @@
 
         if (window.COGNEE_DEBUG) console.log('[CogneeAI sensor] Застревание на абзаце:', paragraphDwellSec.toFixed(1), 'сек');
     }
-
-    // ─── ЗАДАЧА 2.4: КИМ-снапшот для умных закладок ──────────────────────────
-    // Публичный API для bookmarks модуля в adapter.js
-    window.CogneeBookmarks = {
-        getKIMSnapshot() {
-            return {
-                kim:  Math.round(smoothedKIM),
-                zone: getZone(smoothedKIM),
-                ts:   Date.now(),
-            };
-        },
-    };
 
     // ─── ПУБЛИЧНЫЙ API ────────────────────────────────────────────────────────
     window.CogneeSensorState = {
@@ -503,7 +488,7 @@
             microPauseWindowReset = now;
         }
 
-        // Задача 2.1: проверяем застревание каждую секунду
+        // Проверяем застревание на абзаце каждую секунду
         _detectStruggle();
 
     }, 1000);
