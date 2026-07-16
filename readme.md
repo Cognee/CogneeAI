@@ -1,7 +1,7 @@
 # Cognee — Adaptive Reading Platform
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-cognee.github.io-38c8f8?style=flat-square)](https://cognee.github.io/CogneeAI/)
-[![Version](https://img.shields.io/badge/Version-9.1-7c5cf4?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-1.0-7c5cf4?style=flat-square)](#)
 [![License](https://img.shields.io/badge/License-MIT-3ee8a0?style=flat-square)](LICENSE)
 
 > Система читает твоё когнитивное состояние через поведение,  
