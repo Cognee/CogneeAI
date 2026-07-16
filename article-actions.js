@@ -1,5 +1,4 @@
-// article-actions.js — v8.5.2
-// Файл: article-actions.js | Глобальная версия: 8.5.2
+// article-actions.js — v1.0
 // Действия над статьёй: меню публикации, шаринг, избранное
 
 (function () {

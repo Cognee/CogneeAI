@@ -53,34 +53,7 @@ sensor.js [16 сенсоров] → CogneeAI ONNX [SimpleRNN] → КИМ [0-100]
 | Усталость (1–10) | A | B |
 | Хотят использовать | C% | D% |
 
-*Данные обновляются по мере сбора — см. [results.html](results.html)*
-
----
-
-## Быстрый старт
-
-```bash
-# 1. Клонируй репозиторий
-git clone https://github.com/cogneeAI/CogneeAI.git
-cd CogneeAI
-
-# 2. Создай config.js из шаблона
-cp config.example.js config.js
-# Заполни COGNEE_SUPABASE_URL и COGNEE_SUPABASE_KEY
-
-# 3. Открой в браузере
-open landing.html
-# или используй Live Server в VS Code
-
-# 4. Жми "Попробовать демо" — статья-пример читается через reader.html?id=1
-# 5. Открой dashboard.html для просмотра КИМ-профиля
-```
-
-**Для полной функциональности (AI, авторизация, каталог):**
-1. Создай проект на [supabase.com](https://supabase.com)
-2. Запусти SQL из `supabase_setup.sql`, затем `supabase_migration_v8.3.3.sql`, затем `supabase_migration_v9_0.sql`
-3. Задеплой Edge Function: `supabase functions deploy gemini-proxy --no-verify-jwt`
-4. Добавь `GEMINI_API_KEY` в Supabase → Project Settings → Edge Functions → Secrets
+*Данные обновляются по мере сбора — см. [results.html](https://cognee.github.io/CogneeAI/results.html)*
 
 ---
 
@@ -105,13 +78,8 @@ CogneeAI/
 ├── styles.css          ← Тёмная/светлая тема, 3 режима
 ├── cogneeai.js         ← Универсальный SDK (embed)
 ├── config.js           ← Ключи (в .gitignore)
-├── config.example.js   ← Шаблон конфига
-├── model/
-│   └── cognee_ai.onnx  ← CogneeAI SimpleRNN модель
-└── supabase/
-    └── functions/
-        └── gemini-proxy/
-            └── index.ts ← Edge Function (прокси Gemini)
+└── model/
+    └── cognee_ai.onnx  ← CogneeAI SimpleRNN модель
 ```
 
 ---

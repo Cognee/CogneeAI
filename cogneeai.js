@@ -1,5 +1,4 @@
-// cogneeai.js — v8.4
-// Файл: cogneeai.js | Глобальная версия: 8.4
+// cogneeai.js — v1.0
 // CogneeAI Universal SDK
 //
 // Встройте Cognee на любой сайт одной строкой:

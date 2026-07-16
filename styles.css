@@ -1,14 +1,6 @@
 
 /* ═══════════════════════════════════════════════════════════
-   Cognee — styles.css v9.1
-   Файл: styles.css | Глобальная версия: 9.1
-   Изменения v9.1 (Блок 2):
-   - Задача 2.1: стили .explain-btn, .explain-result, .explain-close
-   - Задача 2.2: стили #read-time-left (адаптивный таймер чтения)
-   - Задача 2.3: .article-card-tag, .article-card-kim, .article-tag, #kim-recommend-banner
-   - Задача 2.4: #cognee-bookmark-btn, #cognee-bookmark-toast
-   - Задача 2.5: #cognee-chrono-notice (хронорежим)
-   - Блок 1 v9.0 сохранён полностью
+   Cognee — styles.css v1.0
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── CSS-ПЕРЕМЕННЫЕ: ТЁМНАЯ ТЕМА (по умолчанию) ─────────────────────────── */

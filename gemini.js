@@ -1,5 +1,4 @@
-// gemini.js — v9.2
-// Файл: gemini.js | Глобальная версия: 9.2
+// gemini.js — v1.0
 // Клиент Gemini через Edge Function: упрощение текста, перефраз, теги, аннотация
 
 (function () {
