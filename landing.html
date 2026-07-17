@@ -526,7 +526,10 @@ window.addEventListener('resize',()=>{rsz();mkPts()},{passive:true});
 
     if (CogneeSupabase.isAuthenticated()) {
         const isMod = await CogneeSupabase.isModerator().catch(()=>false);
-        if (isMod) initVisitsPanel();
+        if (isMod) {initVisitsPanel();}
+        else{CogneeSupabase.logLandingVisit(location.pathname).catch(()=>{});}
+    }
+    else {CogneeSupabase.logLandingVisit(location.pathname).catch(()=>{});
     }
 })();
 
