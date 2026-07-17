@@ -1,5 +1,6 @@
 <!-- reader.html — v1.0 -->
 <!--
+  Адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
   Деликатный баннер если КИМ < recommended_kim - 10
 -->
 <!DOCTYPE html>
@@ -315,7 +316,6 @@
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
-        
         if (window.CogneeAdapter && window.CogneeAdapter.refreshBlocks) {
             window.CogneeAdapter.refreshBlocks();
         }
@@ -453,7 +453,6 @@
             if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
-            
             
             return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
         }).join('');
