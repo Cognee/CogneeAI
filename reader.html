@@ -1,3 +1,7 @@
+<!-- reader.html — v1.0 -->
+<!--
+  Деликатный баннер если КИМ < recommended_kim - 10
+-->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -19,7 +23,7 @@
             position: sticky; top: 0; z-index: 100;
             background: rgba(15,15,15,0.92); backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(79,195,247,0.1);
-            padding: 0 16px 0 24px; height: 56px;
+            padding: 0 16px 0 24px; height: 52px;
             display: flex; align-items: center; gap: 12px;
         }
         [data-theme="light"] .reader-nav { background: rgba(245,240,232,0.93); }
@@ -37,7 +41,7 @@
         #nav-actions-wrap { flex-shrink: 0; display: flex; align-items: center; }
 
         .read-progress {
-            position: fixed; top: 56px; left: 0; height: 2px; width: 0%;
+            position: fixed; top: 52px; left: 0; height: 2px; width: 0%;
             background: linear-gradient(90deg, #4FC3F7, #7C4DFF); z-index: 101; transition: width 0.1s;
         }
 
@@ -133,7 +137,7 @@
         .btn-catalog { display:inline-block; margin:4px 8px; padding:10px 20px; border-radius:8px; font-size:13px; text-decoration:none; background:rgba(124,77,255,0.1); color:#7C4DFF; border:1px solid rgba(124,77,255,0.3); }
 
         @media (max-width: 600px) {
-            .reader-nav { padding: 0 12px; height: 52px; }
+            .reader-nav { padding: 0 12px; }
             .reader-nav-link { display: none; }
             .article-title { font-size: clamp(18px, 5vw, 28px); }
             .meta-row { gap: 8px; }
