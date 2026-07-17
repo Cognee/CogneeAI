@@ -522,7 +522,7 @@ window.addEventListener('resize',()=>{rsz();mkPts()},{passive:true});
     if(!window.CogneeSupabase||!window.COGNEE_SUPABASE_URL||!window.COGNEE_SUPABASE_KEY) return;
     await CogneeSupabase.init().catch(()=>{});
 
-    CogneeSupabase.logLandingVisit(location.pathname).catch(()=>{});
+    
 
     if (CogneeSupabase.isAuthenticated()) {
         const isMod = await CogneeSupabase.isModerator().catch(()=>false);
