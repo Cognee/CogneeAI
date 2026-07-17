@@ -144,53 +144,12 @@
             .meta-row { gap: 8px; }
             :root { --reader-max: 100%; }
         }
-    
-#kim-display,#dash-link,#profile-link,#bookmark-link,#brightness-toggle{
-position:relative;
-top:8px;
-}
-
-
-#ui-sidebar{
-position:fixed;
-top:70px;
-right:12px;
-display:flex;
-flex-direction:column;
-align-items:center;
-gap:10px;
-z-index:1000;
-}
-#ui-sidebar>a,#ui-sidebar>button,#ui-sidebar>div{
-width:44px;
-min-height:44px;
-display:flex;
-align-items:center;
-justify-content:center;
-border-radius:10px;
-box-sizing:border-box;
-}
-#kim-display{
-width:60px!important;
-min-height:60px!important;
-font-size:11px;
-text-align:center;
-padding:6px;
-white-space:normal;
-}
-@media(max-width:700px){
-#ui-sidebar{top:60px;right:8px;gap:8px}
-}
-
-</style>
+    </style>
 </head>
 <body data-theme="dark">
-<div id="ui-sidebar">
-<div id="kim-display" title="Когнитивный Индекс Момента — CogneeAI">КИМ: —</div>
-<button id="brightness-toggle" title="Смена темы">🌙</button>
-<a id="dash-link" href="dashboard.html" title="Когнитивный профиль">📊</a>
-<a id="profile-link" href="profile.html" title="Профиль">👤</a>
-</div>
+    <div id="kim-display" title="Когнитивный Индекс Момента — CogneeAI">КИМ: —</div>
+    <a id="dash-link" href="dashboard.html" title="Когнитивный профиль">📊</a>
+    <a id="profile-link" href="profile.html" title="Профиль">👤</a>
 
     <div class="read-progress" id="read-progress"></div>
 
@@ -357,6 +316,7 @@ white-space:normal;
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
+        
         if (window.CogneeAdapter && window.CogneeAdapter.refreshBlocks) {
             window.CogneeAdapter.refreshBlocks();
         }
@@ -494,6 +454,7 @@ white-space:normal;
             if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
+
             
             return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
         }).join('');
@@ -513,4 +474,3 @@ white-space:normal;
     })();
     </script>
 </body>
-</html>
