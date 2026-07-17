@@ -336,7 +336,7 @@ body.mode-tired h2 {
     border-radius: 8px;
     border-left: 3px solid #4FC3F7;
     position: fixed;
-    top: 20px;
+    top: 64px;
     right: 20px;
     z-index: 9999;
     letter-spacing: 0.06em;
@@ -358,7 +358,7 @@ body.mode-tired h2 {
 
 /* ─── КНОПКА ТЕМЫ ────────────────────────────────────────────────────────── */
 #cognee-theme-toggle {
-    position: fixed; top: 64px; right: 20px; z-index: 9999;
+    position: fixed; top: 112px; right: 20px; z-index: 9999;
     background: transparent; border: 1px solid rgba(255,255,255,0.15);
     color: #a0b8d0; font-size: 16px; width: 36px; height: 36px;
     border-radius: 50%; cursor: pointer;
@@ -375,7 +375,7 @@ body.mode-tired h2 {
 
 /* ─── ССЫЛКА НА ДАШБОРД ──────────────────────────────────────────────────── */
 #dash-link {
-    position: fixed; top: 108px; right: 20px; z-index: 9999;
+    position: fixed; top: 156px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
@@ -387,7 +387,7 @@ body.mode-tired h2 {
 
 /* ─── ССЫЛКА НА ПРОФИЛЬ ──────────────────────────────────────────────────── */
 #profile-link {
-    position: fixed; top: 152px; right: 20px; z-index: 9999;
+    position: fixed; top: 200px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
@@ -399,7 +399,7 @@ body.mode-tired h2 {
 
 /* ─── КНОПКА ЗАКЛАДКИ ────────────────────────────────────────────────────── */
 #cognee-bookmark-btn {
-    position: fixed; top: 196px; right: 20px; z-index: 9999;
+    position: fixed; top: 244px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
@@ -479,15 +479,15 @@ body.mode-tired h2 {
 @media (max-width: 600px) {
 
     #kim-display {
-        font-size: 11px; padding: 5px 9px; top: 8px; right: 8px;
+        font-size: 11px; padding: 5px 9px; top: 60px; right: 8px;
         max-width: calc(100vw - 16px); white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis;
     }
 
-    #cognee-theme-toggle { top: 44px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #dash-link            { top: 80px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #profile-link          { top: 116px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #cognee-bookmark-btn   { top: 152px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #cognee-theme-toggle { top: 96px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #dash-link            { top: 132px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #profile-link          { top: 168px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #cognee-bookmark-btn   { top: 204px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
 
     #cognee-mode-switcher {
         flex-direction: row !important; flex-wrap: wrap !important; gap: 4px !important;
