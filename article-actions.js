@@ -80,7 +80,11 @@
         }
 
         .ca-dropdown {
-            position: absolute;
+            /* position/top/right — запасные значения на случай, если JS
+               по какой-то причине не выставит инлайн-стили; реальные
+               координаты вычисляются в _buildDropdown() и монтируются
+               в document.body, минуя stacking context родительских блоков */
+            position: fixed;
             top: calc(100% + 6px);
             right: 0;
             min-width: 200px;
@@ -533,21 +537,44 @@
             dd.appendChild(el);
         });
 
-        triggerBtn.style.position = 'relative';
-        triggerBtn.appendChild(dd);
+        // ── ПОРТАЛ В body ────────────────────────────────────────────────────
+        // Меню НЕ добавляется как потомок кнопки: если кнопка лежит внутри
+        // элемента со своим stacking context (например, <nav> с backdrop-filter
+        // на reader.html/catalog.html/moderation.html), то z-index меню
+        // работал бы только "локально" внутри этого контекста и не смог бы
+        // перекрыть фиксированные элементы страницы (КИМ-дисплей, кнопки
+        // dashboard/profile/landing и т.д.), даже если задать z-index очень
+        // большим. Поэтому меню всегда крепится напрямую к <body> с
+        // position:fixed и координатами, вычисленными от кнопки-триггера —
+        // так оно всегда сравнивается в корневом контексте наложения страницы.
+        const triggerRect = triggerBtn.getBoundingClientRect();
+        dd.style.position = 'fixed';
+        dd.style.top      = (triggerRect.bottom + 6) + 'px';
+        dd.style.right    = (window.innerWidth - triggerRect.right) + 'px';
+        dd.style.left     = 'auto';
+
+        document.body.appendChild(dd);
 
         requestAnimationFrame(() => {
             if (!document.body.contains(dd)) return;
             const rect = dd.getBoundingClientRect();
-            if (rect.bottom > window.innerHeight - 16) {
+            // Вылезает за нижний край экрана — открываем вверх от кнопки
+            if (rect.bottom > window.innerHeight - 12) {
                 dd.style.top    = 'auto';
-                dd.style.bottom = 'calc(100% + 6px)';
+                dd.style.bottom = (window.innerHeight - triggerRect.top + 6) + 'px';
             }
-            if (rect.right > window.innerWidth - 8) {
-                dd.style.right = '0';
-                dd.style.left  = 'auto';
+            // Вылезает за левый край экрана — прижимаем к левому краю кнопки
+            if (rect.left < 8) {
+                dd.style.left  = triggerRect.left + 'px';
+                dd.style.right = 'auto';
             }
         });
+
+        // Закрываем меню при скролле/ресайзе — иначе фиксированная позиция
+        // "отвяжется" от кнопки, которая находится в обычном потоке документа
+        const _closeOnReflow = () => _closeActive();
+        window.addEventListener('scroll', _closeOnReflow, { capture: true, passive: true, once: true });
+        window.addEventListener('resize', _closeOnReflow, { once: true });
 
         _activeDropdown = dd;
     }
