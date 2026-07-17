@@ -517,9 +517,54 @@ function draw(){
 rsz();mkPts();draw();
 window.addEventListener('resize',()=>{rsz();mkPts()},{passive:true});
 
-// Supabase init
-(async()=>{if(!window.CogneeSupabase||!window.COGNEE_SUPABASE_URL||!window.COGNEE_SUPABASE_KEY)return;await CogneeSupabase.init().catch(()=>{})})();
+// Supabase init 
+(async()=>{
+    if(!window.CogneeSupabase||!window.COGNEE_SUPABASE_URL||!window.COGNEE_SUPABASE_KEY) return;
+    await CogneeSupabase.init().catch(()=>{});
 
+    CogneeSupabase.logLandingVisit(location.pathname).catch(()=>{});
+
+    if (CogneeSupabase.isAuthenticated()) {
+        const isMod = await CogneeSupabase.isModerator().catch(()=>false);
+        if (isMod) initVisitsPanel();
+    }
+})();
+
+function initVisitsPanel(){
+    const panel = document.createElement('div');
+    panel.id = 'cognee-visits-panel';
+    panel.style.cssText = `
+        position:fixed;bottom:16px;left:16px;z-index:99999;
+        background:rgba(3,5,11,.92);border:1px solid rgba(56,200,248,.3);
+        border-radius:12px;padding:12px 16px;font-family:'JetBrains Mono',monospace;
+        font-size:11px;color:#eef3ff;max-width:280px;backdrop-filter:blur(10px);
+        box-shadow:0 8px 32px rgba(0,0,0,.5);
+    `;
+    panel.innerHTML = `
+        <div style="color:#38c8f8;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            👁 Статистика входов
+            <span style="margin-left:auto;cursor:pointer;opacity:.6" id="cvp-close">×</span>
+        </div>
+        <div id="cvp-body">загрузка…</div>`;
+    document.body.appendChild(panel);
+
+    document.getElementById('cvp-close').addEventListener('click', () => panel.remove());
+
+    async function refresh(){
+        const stats = await CogneeSupabase.getLandingStats(20).catch(()=>null);
+        const body = document.getElementById('cvp-body');
+        if (!body) return; 
+        if (!stats) { body.textContent = 'нет данных'; return; }
+        const list = stats.recent.map(r=>{
+            const t = new Date(r.created_at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            return `<div style="opacity:.75;padding:2px 0">${t} · ${r.path||'/'}</div>`;
+        }).join('');
+        body.innerHTML = `Сегодня: <b>${stats.today}</b> · последние ${stats.shown}:
+            <div style="margin-top:6px;max-height:160px;overflow-y:auto">${list}</div>`;
+    }
+    refresh();
+    setInterval(() => { if (document.getElementById('cognee-visits-panel')) refresh(); }, 15000);
+}
 // Reveal
 const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.09});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));

@@ -241,7 +241,33 @@
         const monday = new Date(d.setDate(diff));
         return monday.toISOString().slice(0, 10);
     }
+//статистика 
+async function logLandingVisit(path) {
+    if (!supabaseUrl || !supabaseKey) return;
+    try {
+        await _fetch('/rest/v1/landing_visits', 'POST', [{
+            path:     path || location.pathname,
+            referrer: document.referrer || null,
+        }]);
+    } catch (e) {
+    }
+}
 
+async function getLandingStats(limit) {
+    if (!isAuthenticated()) return null;
+    try {
+        const rows = await _dbFetch('GET',
+            '/rest/v1/landing_visits?select=created_at,path,referrer' +
+            '&order=created_at.desc&limit=' + (limit || 50));
+        if (!Array.isArray(rows)) return null;
+        const todayStr = new Date().toDateString();
+        const todayCount = rows.filter(r => new Date(r.created_at).toDateString() === todayStr).length;
+        return { recent: rows, shown: rows.length, today: todayCount };
+    } catch (e) {
+        console.warn('[CogneeSupabase] getLandingStats:', e.message);
+        return null;
+    }
+}
     // ─── ИЗБРАННОЕ ───────────────────────────────────────────────────────────
     async function addFavorite(articleId) {
         if (!isAuthenticated()) throw new Error('Не авторизован');
@@ -603,6 +629,7 @@
         submitReport,
         isModerator, getPendingReports, resolveReport,
         saveFocusMinutes, getLeaderboard, getMyLeaderboardEntry,
+        logLandingVisit, getLandingStats, 
         _dbFetch, _rpc,
         checkNameAvailable,
         checkDisplayName: _checkDisplayName,
