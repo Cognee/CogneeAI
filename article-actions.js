@@ -72,6 +72,12 @@
             border-color: rgba(79,195,247,0.25);
             color: #4FC3F7;
         }
+        /* Поднимаем сам триггер, когда меню открыто — чтобы он и его
+           выпадающий список гарантированно рисовались поверх фиксированных
+           элементов страницы (КИМ-дисплей, кнопки dashboard/profile/landing и т.д.) */
+        .ca-trigger.open {
+            z-index: 10051;
+        }
 
         .ca-dropdown {
             position: absolute;
@@ -83,7 +89,9 @@
             border-radius: 12px;
             padding: 6px;
             box-shadow: 0 12px 32px rgba(0,0,0,0.5);
-            z-index: 3000;
+            /* Выше любых fixed-элементов интерфейса (КИМ, кнопки, прогресс-бар и т.п.,
+               у которых z-index доходит до 9999) */
+            z-index: 10050;
             animation: ca-dd-in 0.15s ease;
         }
         [data-theme="light"] .ca-dropdown {
@@ -121,7 +129,9 @@
 
         /* МОДАЛКА ЖАЛОБЫ */
         .ca-modal-overlay {
-            display: none; position: fixed; inset: 0; z-index: 4000;
+            display: none; position: fixed; inset: 0;
+            /* Выше выпадающего меню и любых fixed-элементов страницы */
+            z-index: 10100;
             background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
             align-items: center; justify-content: center;
         }
@@ -170,7 +180,9 @@
 
         /* CONFIRM УДАЛЕНИЯ */
         .ca-confirm-overlay {
-            display: none; position: fixed; inset: 0; z-index: 4000;
+            display: none; position: fixed; inset: 0;
+            /* Выше выпадающего меню и любых fixed-элементов страницы */
+            z-index: 10100;
             background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
             align-items: center; justify-content: center;
         }
@@ -423,16 +435,7 @@
         dd.className = 'ca-dropdown';
         dd._trigger  = triggerBtn;
 
-       
-        dd.addEventListener('click', e => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-
         const items = [];
-
-        // — Читать
-        items.push({ icon: '📖', label: 'Читать статью', action: () => { location.href = articleUrl; } });
 
         // — Избранное
         if (!config.noFavorite) {
@@ -470,7 +473,7 @@
             }
         }
 
-        // — Скопировать ссылку
+        // — Скопировать ссылку (Telegram убран)
         items.push({ icon: '🔗', label: 'Скопировать ссылку', action: () => {
             const fullUrl = location.origin + '/' + articleUrl;
             navigator.clipboard.writeText(fullUrl).then(() => {
@@ -485,7 +488,7 @@
         if (config.isOwner) {
             items.push({ sep: true });
             items.push({ icon: '✏️', label: 'Редактировать', action: () => {
-                location.href = 'editor.html?id=' + config.articleId;
+                location.href = 'editor.html?edit=' + config.articleId;
                 _closeActive();
             }});
             items.push({ icon: '🗑', label: 'Удалить статью', cls: 'danger', action: async () => {
@@ -524,8 +527,6 @@
             el.className = 'ca-dropdown-item' + (item.cls ? ' ' + item.cls : '');
             el.innerHTML = `<span class="ca-item-icon">${item.icon}</span>${_esc(item.label)}`;
             el.addEventListener('click', e => {
-                
-                e.preventDefault();
                 e.stopPropagation();
                 item.action(el);
             });
