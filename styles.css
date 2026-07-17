@@ -1,6 +1,7 @@
 
 /* ═══════════════════════════════════════════════════════════
    Cognee — styles.css v1.0
+   Общие стили платформы: темы, адаптация под КИМ, читалка, каталог, профиль
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── CSS-ПЕРЕМЕННЫЕ: ТЁМНАЯ ТЕМА (по умолчанию) ─────────────────────────── */
@@ -356,6 +357,14 @@ body.mode-tired h2 {
 }
 
 /* ─── КНОПКА ТЕМЫ ────────────────────────────────────────────────────────── */
+#cognee-theme-toggle {
+    position: fixed; top: 64px; right: 20px; z-index: 9999;
+    background: transparent; border: 1px solid rgba(255,255,255,0.15);
+    color: #a0b8d0; font-size: 16px; width: 36px; height: 36px;
+    border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
 #cognee-theme-toggle:hover { background: rgba(255,255,255,0.1) !important; }
 [data-theme="light"] #cognee-theme-toggle { color: #4a3f35 !important; border-color: rgba(0,0,0,0.2) !important; }
 [data-theme="light"] #cognee-theme-toggle:hover { background: rgba(0,0,0,0.08) !important; }
@@ -366,7 +375,7 @@ body.mode-tired h2 {
 
 /* ─── ССЫЛКА НА ДАШБОРД ──────────────────────────────────────────────────── */
 #dash-link {
-    position: fixed; top: 60px; right: 20px; z-index: 9999;
+    position: fixed; top: 108px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
@@ -378,7 +387,7 @@ body.mode-tired h2 {
 
 /* ─── ССЫЛКА НА ПРОФИЛЬ ──────────────────────────────────────────────────── */
 #profile-link {
-    position: fixed; top: 104px; right: 20px; z-index: 9999;
+    position: fixed; top: 152px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
@@ -388,20 +397,20 @@ body.mode-tired h2 {
 }
 #profile-link:hover { background-color: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
 
-/* ─── ССЫЛКА НА ЛЕНДИНГ ──────────────────────────────────────────────────── */
-#landing-link {
-    position: fixed; top: 148px; right: 20px; z-index: 9999;
+/* ─── КНОПКА ЗАКЛАДКИ ────────────────────────────────────────────────────── */
+#cognee-bookmark-btn {
+    position: fixed; top: 196px; right: 20px; z-index: 9999;
     background-color: var(--kim-bg); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 8px; width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; text-decoration: none; line-height: 1;
+    font-size: 17px; text-decoration: none; line-height: 1; cursor: pointer;
     box-shadow: 0 2px 16px rgba(0,0,0,0.3);
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-#landing-link:hover { background-color: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
+#cognee-bookmark-btn:hover { background-color: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
 
 /* ═══════════════════════════════════════════════════════════
-   AI-ЭЛЕМЕНТЫ 
+   AI-ЭЛЕМЕНТЫ
    ═══════════════════════════════════════════════════════════ */
 
 #cognee-ai-status {
@@ -465,7 +474,7 @@ body.mode-tired h2 {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   МОБИЛЬНАЯ АДАПТАЦИЯ 
+   МОБИЛЬНАЯ АДАПТАЦИЯ
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 600px) {
 
@@ -475,9 +484,10 @@ body.mode-tired h2 {
         overflow: hidden; text-overflow: ellipsis;
     }
 
-    #dash-link    { top: 46px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #profile-link { top: 82px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #landing-link { top: 118px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #cognee-theme-toggle { top: 44px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #dash-link            { top: 80px;  right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #profile-link          { top: 116px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
+    #cognee-bookmark-btn   { top: 152px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
 
     #cognee-mode-switcher {
         flex-direction: row !important; flex-wrap: wrap !important; gap: 4px !important;
@@ -494,13 +504,6 @@ body.mode-tired h2 {
         font-size: 14px; padding: 10px 24px;
     }
 
-    #cognee-theme-toggle {
-        top: 8px !important;
-        right: calc(8px + 90px) !important;
-        width: 30px !important; height: 30px !important;
-        font-size: 14px !important;
-    }
-
     #cognee-progress-bar { width: 4px !important; }
 }
 
@@ -512,9 +515,11 @@ body.mode-tired h2 {
     :root { --reader-max: 100% !important; }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   AI-функции читалки: перефраз, таймер, теги, закладки, хронорежим
+   ═══════════════════════════════════════════════════════════ */
 
-
-/* ─── Кнопка "Объясни иначе" ─────────────────────────────────── */
+/* ─── Кнопка "Объясни иначе" ──────────────────────────────────────────────── */
 
 .explain-btn {
     display: inline-flex;
@@ -557,7 +562,7 @@ body.mode-tired h2 {
     background: rgba(26, 122, 181, 0.14); border-color: rgba(26, 122, 181, 0.45);
 }
 
-/* ─── Блок результата перефразирования ──────────────────────────────── */
+/* ─── Блок результата перефраза ───────────────────────────────────────────── */
 
 .explain-result {
     display: none;
@@ -612,7 +617,7 @@ body.mode-tired h2 {
 [data-theme="light"] .explain-result-text  { color: #3a4f68; }
 [data-theme="light"] .explain-close        { color: #7a96b0; }
 
-/* ───  Таймер чтения ──────────────────────────────────────────── */
+/* ─── Таймер чтения ────────────────────────────────────────────────────────── */
 
 #read-time-left {
     font-family: 'JetBrains Mono', 'Courier New', monospace;
@@ -624,7 +629,7 @@ body.mode-tired h2 {
 #read-time-left.mode-tired { color: #FFB74D; }
 [data-theme="light"] #read-time-left { color: #7a9aaa; }
 
-/* ─── Теги в каталоге ────────────────────────────────────────── */
+/* ─── Теги в каталоге ──────────────────────────────────────────────────────── */
 
 .article-card-tags {
     display: flex; flex-wrap: wrap; gap: 5px;
@@ -656,7 +661,7 @@ body.mode-tired h2 {
     border-color: rgba(26, 122, 181, 0.18);
 }
 
-/* ───  Баннер рекомендуемого КИМ (reader.html) ──────────────────── */
+/* ─── Баннер рекомендуемого КИМ (reader.html) ─────────────────────────────── */
 
 #kim-recommend-banner {
     max-width: 720px; margin: 0 auto 24px; padding: 0 24px;
@@ -689,7 +694,7 @@ body.mode-tired h2 {
 }
 .kim-rec-close:hover { color: #b39ddb; background: rgba(124, 77, 255, 0.1); }
 
-/* ─── Теги в reader.html ─────────────────────────────────────── */
+/* ─── Теги в reader.html ───────────────────────────────────────────────────── */
 
 .article-tags {
     display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
@@ -703,43 +708,7 @@ body.mode-tired h2 {
     border-radius: 5px; padding: 3px 9px; text-transform: lowercase;
 }
 
-/* ─── Кнопка закладки ────────────────────────────────────────── */
-
-#cognee-bookmark-btn {
-    position: fixed; top: 192px; right: 20px; z-index: 9999;
-    background-color: var(--kim-bg, #0a1020);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px; width: 36px; height: 36px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 17px; cursor: pointer; line-height: 1;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-}
-#cognee-bookmark-btn:hover { transform: scale(1.08); }
-#cognee-bookmark-btn.zone-focus  { border-color: rgba(79, 195, 247, 0.4);  color: #4FC3F7; }
-#cognee-bookmark-btn.zone-normal { border-color: rgba(129, 199, 132, 0.4); color: #81C784; }
-#cognee-bookmark-btn.zone-tired  { border-color: rgba(255, 183, 77, 0.4);  color: #FFB74D; }
-
-/* Тост закладки */
-#cognee-bookmark-toast {
-    position: fixed; top: 192px; right: 66px; z-index: 10002;
-    background: rgba(10, 16, 32, 0.92);
-    border: 1px solid rgba(79, 195, 247, 0.25);
-    border-radius: 8px; padding: 6px 12px;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
-    font-size: 11px; color: #4FC3F7; letter-spacing: 0.03em;
-    white-space: nowrap; pointer-events: none;
-    opacity: 0; transform: translateX(10px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
-}
-#cognee-bookmark-toast.visible { opacity: 1; transform: translateX(0); }
-
-@media (max-width: 600px) {
-    #cognee-bookmark-btn { top: 154px; right: 8px; width: 30px; height: 30px; font-size: 14px; }
-    #cognee-bookmark-toast { display: none; }
-}
-
-/* ─── Хроно-уведомление ──────────────────────────────────────── */
+/* ─── Хроно-уведомление ────────────────────────────────────────────────────── */
 
 #cognee-chrono-notice {
     position: fixed; bottom: 100px; left: 50%;

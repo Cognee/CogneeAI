@@ -82,7 +82,7 @@
         document.body.appendChild(bar);
     }
 
-   function updateProgressBar() {
+    function updateProgressBar() {
         const bar = document.getElementById('cognee-progress-bar');
         if (!bar) return;
         const docH = document.documentElement.scrollHeight - window.innerHeight;
@@ -235,14 +235,6 @@
         btn.id = 'cognee-theme-toggle';
         btn.textContent = '☀';
         btn.title = 'Переключить тему';
-        btn.style.cssText = `
-            position:fixed; top:20px; right:170px;
-            background:transparent; border:1px solid rgba(255,255,255,0.15);
-            color:#a0b8d0; font-size:16px; width:36px; height:36px;
-            border-radius:50%; cursor:pointer; z-index:10001;
-            transition:background 0.2s, color 0.2s, border-color 0.2s;
-            display:flex; align-items:center; justify-content:center;
-        `;
         btn.addEventListener('click', toggleTheme);
         document.body.appendChild(btn);
     }
@@ -440,18 +432,31 @@
             if (triggerBtn) triggerBtn.style.display = 'none';
         }
         document.querySelectorAll('p').forEach(p => p.classList.remove('active-para'));
+
+        // Возвращаем оригинальный текст обычных статей (упрощённая версия остаётся в кэше)
+        document.querySelectorAll('.article-content-inner p[data-original-text]').forEach(p => {
+            if (p.textContent !== p.dataset.originalText) {
+                p.textContent = p.dataset.originalText;
+                p.classList.remove('ai-simplified');
+            }
+        });
     }
 
     function highlightClosestParagraph() {
         const target     = UPPER_THIRD();
-        const candidates = [];
+        let candidates   = [];
 
-        allBlocks.forEach(block => {
-            const full    = block.querySelector('.para-full');
-            const simple  = block.querySelector('.para-simple');
-            const showing = block.dataset.showing === 'simple' ? simple : full;
-            if (showing && showing.offsetHeight > 0) candidates.push(showing);
-        });
+        if (allBlocks.length > 0) {
+            allBlocks.forEach(block => {
+                const full    = block.querySelector('.para-full');
+                const simple  = block.querySelector('.para-simple');
+                const showing = block.dataset.showing === 'simple' ? simple : full;
+                if (showing && showing.offsetHeight > 0) candidates.push(showing);
+            });
+        } else {
+            candidates = Array.from(document.querySelectorAll('.article-content-inner p'))
+                .filter(p => p.offsetHeight > 0);
+        }
 
         if (candidates.length === 0) return;
 
@@ -471,7 +476,9 @@
     // ─── ПОДСВЕТКА КЛЮЧЕВЫХ СЛОВ (локальный fallback) ────────────────────────
     function highlightKeywords() {
         const wordRe = /[\u0400-\u04FFa-zA-Z]{9,}/g;
-        const paras  = document.querySelectorAll('.para-full');
+        const paras  = allBlocks.length > 0
+            ? document.querySelectorAll('.para-full')
+            : document.querySelectorAll('.article-content-inner p');
         let count    = 0;
         const max    = 5;
 
@@ -512,6 +519,11 @@
     async function triggerAISimplification() {
         if (!window.CogneeAI) return;
 
+        if (allBlocks.length === 0) {
+            await _simplifyPlainParagraphs();
+            return;
+        }
+
         const blocks = Array.from(document.querySelectorAll('.para-block'));
         const needAI = blocks.filter(block => {
             const simple = block.querySelector('.para-simple');
@@ -542,6 +554,47 @@
         }
 
         hideAIStatus(2000);
+    }
+
+    // Обычные статьи (без para-block): упрощаем текст прямо в <p>,
+    // с кэшем — повторный вход в tired не бьёт по лимитам Gemini заново.
+    async function _simplifyPlainParagraphs() {
+        const paras = Array.from(document.querySelectorAll('.article-content-inner p'));
+        if (paras.length === 0) return;
+
+        paras.forEach(p => {
+            if (!p.dataset.originalText) p.dataset.originalText = p.textContent;
+        });
+
+        const needAI = paras.filter(p => !p.dataset.simplifiedText);
+
+        if (needAI.length > 0) {
+            showAIStatus(`⚡ CogneeAI упрощает ${needAI.length} абзац(ев)…`);
+            let done = 0;
+            for (const p of needAI) {
+                showAISpinner(p);
+                try {
+                    const simplified = await window.CogneeAI.simplifyParagraph(p.dataset.originalText);
+                    if (simplified) p.dataset.simplifiedText = simplified;
+                } catch (e) {
+                    console.warn('[adapter.js] AI-упрощение не удалось:', e);
+                }
+                hideAISpinner(p);
+                done++;
+                showAIStatus(`⚡ CogneeAI: ${done}/${needAI.length} абзацев обработано`);
+            }
+            hideAIStatus(2000);
+        }
+
+        // Показываем упрощённые версии, только если всё ещё в режиме tired
+        if (document.body.classList.contains('mode-tired')) {
+            paras.forEach(p => {
+                if (p.dataset.simplifiedText && p.textContent !== p.dataset.simplifiedText) {
+                    p.textContent = p.dataset.simplifiedText;
+                    p.classList.add('ai-simplified');
+                }
+            });
+        }
     }
 
     function injectSimplified(block, text) {
@@ -576,7 +629,9 @@
     async function triggerAIKeywords() {
         if (_keywordsApplied) return;
 
-        const allParas      = Array.from(document.querySelectorAll('.para-full'));
+        const allParas      = allBlocks.length > 0
+            ? Array.from(document.querySelectorAll('.para-full'))
+            : Array.from(document.querySelectorAll('.article-content-inner p'));
         const eligibleParas = allParas.filter(p => !_isKeywordsForbidden(p));
 
         if (!window.CogneeAI) {
@@ -774,26 +829,8 @@
         const btn = document.createElement('button');
         btn.id    = 'cognee-bookmark-btn';
         btn.title = 'Добавить закладку (запомнит место в статье)';
-        btn.style.cssText = `
-            position:fixed; top:192px; right:20px;
-            background:var(--kim-bg,#0a1020);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:8px; width:36px; height:36px;
-            display:flex; align-items:center; justify-content:center;
-            font-size:17px; cursor:pointer; z-index:9999;
-            box-shadow:0 2px 16px rgba(0,0,0,0.3);
-            transition:background 0.2s, border-color 0.2s;
-        `;
         btn.textContent = '🔖';
         btn.addEventListener('click', addBookmark);
-        btn.addEventListener('mouseenter', () => {
-            btn.style.background = 'rgba(79,195,247,0.15)';
-            btn.style.borderColor = 'rgba(79,195,247,0.3)';
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.background = '';
-            btn.style.borderColor = '';
-        });
         document.body.appendChild(btn);
 
         // Инициализируем тултип закладок

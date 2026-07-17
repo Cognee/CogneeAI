@@ -423,6 +423,18 @@
         dd.className = 'ca-dropdown';
         dd._trigger  = triggerBtn;
 
+        // ФИКС: карточки статей (например, в catalog.html) целиком являются
+        // кликабельной ссылкой <a>. Любой клик внутри dd, который дойдёт до <a>
+        // без preventDefault(), браузер трактует как переход по ссылке —
+        // так открывалась сама статья вместо выполнения пункта меню.
+        // Ставим "страховку" на весь контейнер дропдауна: гасим клики по
+        // пустым зонам (паддинги, разделители), а на каждый пункт меню
+        // preventDefault ставится отдельно ниже.
+        dd.addEventListener('click', e => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
         const items = [];
 
         // — Читать
@@ -518,6 +530,13 @@
             el.className = 'ca-dropdown-item' + (item.cls ? ' ' + item.cls : '');
             el.innerHTML = `<span class="ca-item-icon">${item.icon}</span>${_esc(item.label)}`;
             el.addEventListener('click', e => {
+                // ФИКС: раньше здесь стоял только stopPropagation() — этого
+                // недостаточно, если пункт меню лежит внутри <a> (карточка
+                // статьи в каталоге). Браузер выполняет переход по ссылке
+                // на основании отсутствия preventDefault(), а не пузырения
+                // события, поэтому без preventDefault() клик по пункту меню
+                // (например «В избранное») открывал саму статью.
+                e.preventDefault();
                 e.stopPropagation();
                 item.action(el);
             });
@@ -549,5 +568,5 @@
 
     window.CogneeActions = { mountMenu, showToast, initToastContainer };
 
-    if (window.COGNEE_DEBUG) console.log('[CogneeActions v8.5.2] Загружен.');
+    if (window.COGNEE_DEBUG) console.log('[CogneeActions v1.0] Загружен.');
 })();
