@@ -80,7 +80,7 @@
 
     window.currentKIM = 70;
 
-    // ─── ЗАДАЧА 2.1: Детекция застревания ────────────────────────────────────
+    // ─── ДЕТЕКЦИЯ ЗАСТРЕВАНИЯ ────────────────────────────────────────────────
     // Диспатчим событие если dwell > 35 сек и пользователь не скроллит
     let _lastStruggleDispatch    = 0;
     const STRUGGLE_COOLDOWN_MS   = 60000; // повторно не более раза в минуту
@@ -493,23 +493,39 @@
     }, 1000);
 
     // ─── СЕНСОР 8 — Paragraph revisits ───────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
+    // Вынесено в отдельную функцию: на reader.html контент статьи вставляется
+    // ПОСЛЕ DOMContentLoaded (после запроса к Supabase), поэтому на старте
+    // .para-block ещё не существует. reader.html вызывает
+    // window.CogneeSensor.refreshParagraphObserver() сразу после вставки статьи.
+    let _revisitObserver = null;
+
+    function _setupParagraphObserver() {
         const blocks = document.querySelectorAll('.para-block');
         paragraphsTracked = blocks.length;
-        if ('IntersectionObserver' in window) {
-            const observer = new IntersectionObserver(entries => {
-                entries.forEach(entry => {
-                    if (!entry.isIntersecting) return;
-                    const idx    = Array.from(blocks).indexOf(entry.target);
-                    if (idx === -1) return;
-                    const visits = (paragraphVisits.get(idx) || 0) + 1;
-                    paragraphVisits.set(idx, visits);
-                    if (visits >= 2) viewportRevisitCount++;
-                });
-            }, { threshold: 0.5 });
-            blocks.forEach(b => observer.observe(b));
-        }
-    });
+        paragraphVisits.clear();
+        viewportRevisitCount = 0;
+
+        if (!('IntersectionObserver' in window)) return;
+        if (_revisitObserver) _revisitObserver.disconnect();
+
+        _revisitObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                const idx    = Array.from(blocks).indexOf(entry.target);
+                if (idx === -1) return;
+                const visits = (paragraphVisits.get(idx) || 0) + 1;
+                paragraphVisits.set(idx, visits);
+                if (visits >= 2) viewportRevisitCount++;
+            });
+        }, { threshold: 0.5 });
+
+        blocks.forEach(b => _revisitObserver.observe(b));
+    }
+
+    document.addEventListener('DOMContentLoaded', _setupParagraphObserver);
+
+    window.CogneeSensor = window.CogneeSensor || {};
+    window.CogneeSensor.refreshParagraphObserver = _setupParagraphObserver;
 
     // ─── ВОССТАНОВЛЕНИЕ ──────────────────────────────────────────────────────
     setInterval(() => {

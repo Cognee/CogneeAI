@@ -115,7 +115,7 @@
         #read-time-left.mode-tired { color: #FFB74D; }
 
         .article { max-width: var(--reader-max); margin: 32px auto 80px; padding: 0 24px; }
-        .article-content-inner { font-family: 'Lora', serif; }
+        .article-content-inner { font-family: 'Lora', serif; font-size: 18px; line-height: 1.8; }
         .article-content-inner p  { margin-bottom: 1.4em; }
         .article-content-inner h2 { font-family:'Unbounded',sans-serif; font-size:1.3em; font-weight:700; margin:2em 0 0.7em; letter-spacing:-0.02em; }
         .article-content-inner h3 { font-family:'Unbounded',sans-serif; font-size:1.1em; font-weight:700; margin:1.6em 0 0.5em; }
@@ -316,6 +316,17 @@
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
+        // adapter.js и sensor.js сканируют .para-block один раз при DOMContentLoaded,
+        // а текст статьи вставляется позже (после запроса к Supabase) — поэтому
+        // без ручного пересканирования не работали: подсветка ключевых слов,
+        // режим "устал", детекция застревания и кнопка "Объясни иначе"
+        if (window.CogneeAdapter && window.CogneeAdapter.refreshBlocks) {
+            window.CogneeAdapter.refreshBlocks();
+        }
+        if (window.CogneeSensor && window.CogneeSensor.refreshParagraphObserver) {
+            window.CogneeSensor.refreshParagraphObserver();
+        }
+
         const bar = document.getElementById('read-progress');
         window.addEventListener('scroll', () => {
             const d = document.documentElement.scrollHeight - window.innerHeight;
@@ -323,7 +334,7 @@
         }, { passive: true });
     }
 
-    // ─── ЗАДАЧА 2.2: Адаптивный таймер чтения ────────────────────────────────
+    // ─── Адаптивный таймер чтения ────────────────────────────────────────────
     const WPM = { focus: 220, normal: 170, tired: 110 };
 
     function getZoneLocal(kim) {
@@ -370,7 +381,7 @@
         window.addEventListener('cognee:kim', updateReadingTimer);
     }
 
-    // ─── ЗАДАЧА 2.3: Баннер рекомендуемого КИМ ──────────────────────────────
+    // ─── Баннер рекомендуемого КИМ ───────────────────────────────────────────
     function checkKIMRecommendation(article) {
         if (!article.recommended_kim) return;
 
@@ -446,7 +457,10 @@
             if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
-            return '<p>'+fmt(e(b))+'</p>';
+            // Абзац оборачиваем в .para-block > .para-full — это структура,
+            // которую понимают adapter.js (режим "устал", кнопка "Объясни иначе")
+            // и sensor.js (детекция застревания на абзаце)
+            return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
         }).join('');
     }
     function e(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
