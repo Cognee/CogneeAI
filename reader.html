@@ -315,10 +315,7 @@
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
-        // adapter.js и sensor.js сканируют .para-block один раз при DOMContentLoaded,
-        // а текст статьи вставляется позже (после запроса к Supabase) — поэтому
-        // без ручного пересканирования не работали: подсветка ключевых слов,
-        // режим "устал", детекция застревания и кнопка "Объясни иначе"
+        
         if (window.CogneeAdapter && window.CogneeAdapter.refreshBlocks) {
             window.CogneeAdapter.refreshBlocks();
         }
@@ -456,6 +453,7 @@
             if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
+            
             
             return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
         }).join('');
