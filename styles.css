@@ -509,7 +509,6 @@ body.mode-tired h2 {
 
 @media (max-width: 600px) {
     .reader-nav { padding: 0 12px !important; }
-    .reader-nav-link { display: none !important; }
     .article-title { font-size: clamp(18px, 5vw, 28px) !important; }
     .meta-row { gap: 8px !important; }
     :root { --reader-max: 100% !important; }

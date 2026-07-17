@@ -37,6 +37,7 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted, #5a7090); text-decoration: none;
             letter-spacing: 0.04em; flex-shrink: 0; transition: color 0.2s;
+            display: inline-flex; align-items: center; gap: 4px;
         }
         .reader-nav-link:hover { color: #4FC3F7; }
         #nav-actions-wrap { flex-shrink: 0; display: flex; align-items: center; }
@@ -139,7 +140,8 @@
 
         @media (max-width: 600px) {
             .reader-nav { padding: 0 12px; }
-            .reader-nav-link { display: none; }
+            .reader-nav-link { font-size: 18px; padding: 4px; }
+            .reader-nav-link-label { display: none; }
             .article-title { font-size: clamp(18px, 5vw, 28px); }
             .meta-row { gap: 8px; }
             :root { --reader-max: 100%; }
@@ -156,8 +158,8 @@
     <nav class="reader-nav">
         <a class="reader-nav-logo" href="landing.html">Cognee</a>
         <div class="reader-nav-spacer"></div>
-        <a class="reader-nav-link" href="catalog.html">📚 Каталог</a>
-        <a class="reader-nav-link" href="editor.html">+ Написать</a>
+        <a class="reader-nav-link" href="catalog.html">📚 <span class="reader-nav-link-label">Каталог</span></a>
+        <a class="reader-nav-link" href="editor.html">✏️ <span class="reader-nav-link-label">Написать</span></a>
         <div id="nav-actions-wrap"></div>
     </nav>
 
