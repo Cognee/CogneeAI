@@ -1,6 +1,5 @@
 <!-- reader.html — v1.0 -->
 <!--
-  Адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
   Деликатный баннер если КИМ < recommended_kim - 10
 -->
 <!DOCTYPE html>
@@ -457,9 +456,7 @@
             if (/^>\s/.test(b))    return '<blockquote>'+e(b.replace(/^>\s/,''))+'</blockquote>';
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
-            // Абзац оборачиваем в .para-block > .para-full — это структура,
-            // которую понимают adapter.js (режим "устал", кнопка "Объясни иначе")
-            // и sensor.js (детекция застревания на абзаце)
+            
             return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
         }).join('');
     }
