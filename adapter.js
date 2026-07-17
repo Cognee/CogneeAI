@@ -37,12 +37,11 @@
         const oldBtn = document.getElementById('pause-btn');
         if (oldBtn) oldBtn.remove();
 
-        initProgressBar();
         initPauseOverlay();
         initModeSwitcher();
         initThemeToggle();
         setupScrollWatcher();
-        updateProgressBar();
+        
 
         // Слушаем событие застревания от sensor.js
         document.addEventListener('cognee:paragraph_struggle', onParagraphStruggle);
@@ -58,12 +57,7 @@
         refreshBlocks();
     });
 
-    // ─── ПЕРЕСКАНИРОВАНИЕ БЛОКОВ ПОСЛЕ АСИНХРОННОЙ ВСТАВКИ КОНТЕНТА ─────────────
-    // reader.html вставляет текст статьи ПОСЛЕ DOMContentLoaded (после запроса к Supabase),
-    // поэтому на момент инициализации adapter.js ещё нет ни одного .para-block —
-    // отсюда не работали подсветка ключевых слов, режим "устал" и кнопка "Объясни иначе".
-    // reader.html обязан вызвать window.CogneeAdapter.refreshBlocks() сразу после
-    // вставки innerHTML статьи.
+    
     function refreshBlocks() {
         allBlocks = Array.from(document.querySelectorAll('.para-block'));
         highlightKeywords();
@@ -83,26 +77,6 @@
     window.CogneeAdapter = window.CogneeAdapter || {};
     window.CogneeAdapter.refreshBlocks = refreshBlocks;
 
-    // ─── ПРОГРЕСС-БАР ────────────────────────────────────────────────────────
-    function initProgressBar() {
-        const bar = document.createElement('div');
-        bar.id = 'cognee-progress-bar';
-        bar.style.cssText = `
-            position:fixed; left:0; top:0; width:3px; height:0%;
-            background:linear-gradient(180deg,#4FC3F7,#7C4DFF);
-            z-index:9998; transition:height 0.4s ease;
-            border-radius:0 2px 2px 0;
-        `;
-        document.body.appendChild(bar);
-    }
-
-    function updateProgressBar() {
-        const bar = document.getElementById('cognee-progress-bar');
-        if (!bar) return;
-        const docH = document.documentElement.scrollHeight - window.innerHeight;
-        if (docH <= 0) { bar.style.height = '0%'; return; }
-        bar.style.height = Math.min(100, (window.scrollY / docH) * 100) + '%';
-    }
 
     // ─── ПОЛНОЭКРАННЫЙ ОВЕРЛЕЙ ПАУЗЫ ─────────────────────────────────────────
     function initPauseOverlay() {
@@ -274,7 +248,6 @@
             if (scrollRAF) return;
             scrollRAF = requestAnimationFrame(() => {
                 scrollRAF = null;
-                updateProgressBar();
                 if (lastMode) updateContentByScroll(lastMode);
                 if (document.body.classList.contains('mode-tired')) {
                     highlightClosestParagraph();
