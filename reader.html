@@ -2,6 +2,15 @@
 <!--
   Адаптивный таймер чтения (#read-time-left) — WPM зависит от КИМ-зоны
   Деликатный баннер если КИМ < recommended_kim - 10
+
+  ПАТЧ v1.0: mdToHtml() теперь оборачивает обычные абзацы в .para-block
+  (.para-full + .para-simple), как ожидает adapter.js. Если для абзаца
+  уже есть готовое AI-упрощение из content_simple (сохранённое в editor.html
+  при публикации) — оно подставляется сразу, без повторного запроса к Gemini.
+  После вставки статьи в DOM диспатчится 'cognee:content-ready', чтобы
+  adapter.js (который строит allBlocks в своём собственном DOMContentLoaded,
+  то есть ДО того как статья успевает загрузиться из Supabase) пересобрал
+  список блоков и применил адаптацию заново.
 -->
 <!DOCTYPE html>
 <html lang="ru" data-theme="dark">
@@ -37,7 +46,6 @@
             font-family: 'JetBrains Mono', monospace; font-size: 11px;
             color: var(--muted, #5a7090); text-decoration: none;
             letter-spacing: 0.04em; flex-shrink: 0; transition: color 0.2s;
-            display: inline-flex; align-items: center; gap: 4px;
         }
         .reader-nav-link:hover { color: #4FC3F7; }
         #nav-actions-wrap { flex-shrink: 0; display: flex; align-items: center; }
@@ -116,8 +124,13 @@
         #read-time-left.mode-tired { color: #FFB74D; }
 
         .article { max-width: var(--reader-max); margin: 32px auto 80px; padding: 0 24px; }
-        .article-content-inner { font-family: 'Lora', serif; }
+        .article-content-inner { font-family: 'Lora', serif; font-size: 18px; line-height: 1.8; }
         .article-content-inner p  { margin-bottom: 1.4em; }
+        /* ПАТЧ v1.0: .para-full/.para-simple — это <p> внутри .para-block,
+           само межблочное расстояние задаёт .para-block, иначе оно бы удваивалось */
+        .article-content-inner .para-full,
+        .article-content-inner .para-simple { margin-bottom: 0; }
+        .article-content-inner .para-block  { margin-bottom: 1.4em; }
         .article-content-inner h2 { font-family:'Unbounded',sans-serif; font-size:1.3em; font-weight:700; margin:2em 0 0.7em; letter-spacing:-0.02em; }
         .article-content-inner h3 { font-family:'Unbounded',sans-serif; font-size:1.1em; font-weight:700; margin:1.6em 0 0.5em; }
         .article-content-inner blockquote { border-left:3px solid #4FC3F7; padding-left:1em; color:var(--muted,#5a7090); font-style:italic; margin:1.5em 0; }
@@ -140,8 +153,7 @@
 
         @media (max-width: 600px) {
             .reader-nav { padding: 0 12px; }
-            .reader-nav-link { font-size: 18px; padding: 4px; }
-            .reader-nav-link-label { display: none; }
+            .reader-nav-link { display: none; }
             .article-title { font-size: clamp(18px, 5vw, 28px); }
             .meta-row { gap: 8px; }
             :root { --reader-max: 100%; }
@@ -158,8 +170,8 @@
     <nav class="reader-nav">
         <a class="reader-nav-logo" href="landing.html">Cognee</a>
         <div class="reader-nav-spacer"></div>
-        <a class="reader-nav-link" href="catalog.html">📚 <span class="reader-nav-link-label">Каталог</span></a>
-        <a class="reader-nav-link" href="editor.html">✏️ <span class="reader-nav-link-label">Написать</span></a>
+        <a class="reader-nav-link" href="catalog.html">📚 Каталог</a>
+        <a class="reader-nav-link" href="editor.html">+ Написать</a>
         <div id="nav-actions-wrap"></div>
     </nav>
 
@@ -314,17 +326,18 @@
         }
 
         document.getElementById('article-meta').style.display   = 'block';
-        document.getElementById('article-main').innerHTML        = mdToHtml(a.content||'');
+        // ПАТЧ v1.0: передаём content_simple — готовые AI-упрощения абзацев,
+        // сохранённые в editor.html при обработке/публикации статьи
+        document.getElementById('article-main').innerHTML        = mdToHtml(a.content||'', a.content_simple||null);
         document.getElementById('article-content').style.display = 'block';
         document.getElementById('loading-state').style.display  = 'none';
 
-        
-        if (window.CogneeAdapter && window.CogneeAdapter.refreshBlocks) {
-            window.CogneeAdapter.refreshBlocks();
-        }
-        if (window.CogneeSensor && window.CogneeSensor.refreshParagraphObserver) {
-            window.CogneeSensor.refreshParagraphObserver();
-        }
+        // ПАТЧ v1.0: .para-block появляются в DOM только сейчас — сообщаем
+        // adapter.js, что контент готов, чтобы он пересобрал allBlocks
+        // (его собственный DOMContentLoaded срабатывает раньше, чем статья
+        // успевает загрузиться из Supabase, поэтому без этого события
+        // список блоков там навсегда остаётся пустым)
+        document.dispatchEvent(new CustomEvent('cognee:content-ready'));
 
         const bar = document.getElementById('read-progress');
         window.addEventListener('scroll', () => {
@@ -333,7 +346,7 @@
         }, { passive: true });
     }
 
-    // ─── Адаптивный таймер чтения ────────────────────────────────────────────
+    // ─── ЗАДАЧА 2.2: Адаптивный таймер чтения ────────────────────────────────
     const WPM = { focus: 220, normal: 170, tired: 110 };
 
     function getZoneLocal(kim) {
@@ -380,7 +393,7 @@
         window.addEventListener('cognee:kim', updateReadingTimer);
     }
 
-    // ─── Баннер рекомендуемого КИМ ───────────────────────────────────────────
+    // ─── ЗАДАЧА 2.3: Баннер рекомендуемого КИМ ──────────────────────────────
     function checkKIMRecommendation(article) {
         if (!article.recommended_kim) return;
 
@@ -448,7 +461,13 @@
     }
 
     // ─── Markdown → HTML ──────────────────────────────────────────────────────
-    function mdToHtml(text) {
+    // ПАТЧ v1.0: обычные абзацы оборачиваются в .para-block (.para-full +
+    // .para-simple), как ожидает adapter.js для переключения full/tired версий.
+    // Если для абзаца уже есть готовое упрощение из content_simple —
+    // подставляем его сразу, вместо повторного запроса к Gemini при входе
+    // читателя в режим "устал".
+    function mdToHtml(text, simplifiedJson) {
+        const simpleMap = _buildSimpleMap(simplifiedJson);
         return text.split(/\n\s*\n/).map(b => {
             b = b.trim(); if (!b) return '';
             if (/^#{2}\s/.test(b)) return '<h2>'+e(b.replace(/^#{2}\s/,''))+'</h2>';
@@ -457,10 +476,34 @@
             if (/^---$/.test(b))   return '<hr>';
             if (/^[*-]\s/.test(b)) return '<ul>'+b.split('\n').filter(l=>/^[*-]\s/.test(l.trim())).map(l=>'<li>'+fmt(e(l.replace(/^[*-]\s/,'')))+'</li>').join('')+'</ul>';
 
-            
-            return '<div class="para-block"><p class="para-full">'+fmt(e(b))+'</p></div>';
+            const simplified = simpleMap.get(b);
+            return '<div class="para-block" data-showing="full">' +
+                       '<p class="para-full">' + fmt(e(b)) + '</p>' +
+                       '<p class="para-simple" style="display:none">' + (simplified ? fmt(e(simplified)) : '') + '</p>' +
+                   '</div>';
         }).join('');
     }
+
+    // ПАТЧ v1.0: парсит content_simple — JSON-строку вида
+    // [{original, simplified}, ...], которую пишет CogneeAI.simplifyParagraphs
+    // (gemini.js) при обработке статьи в editor.html — в Map для быстрого
+    // поиска готового упрощения по точному тексту абзаца.
+    function _buildSimpleMap(json) {
+        const map = new Map();
+        if (!json) return map;
+        try {
+            const arr = JSON.parse(json);
+            if (Array.isArray(arr)) {
+                arr.forEach(item => {
+                    if (item && item.original && item.simplified) {
+                        map.set(String(item.original).trim(), item.simplified);
+                    }
+                });
+            }
+        } catch (e) {}
+        return map;
+    }
+
     function e(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     function fmt(s){ return s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>'); }
 
