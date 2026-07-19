@@ -63,7 +63,7 @@ sensor.js [16 сенсоров] → CogneeAI ONNX [SimpleRNN] → КИМ [0-100]
 CogneeAI/
 ├── index.html          ← Редирект на landing.html (нужен для GitHub Pages: отдаётся по корневому URL)
 ├── landing.html        ← Публичный лендинг (главная страница проекта)
-├── reader.html         ← Читалка статей (включая демо-статью id=1)
+├── reader.html         ← Читалка статей
 ├── editor.html         ← Редактор с AI-обработкой
 ├── catalog.html        ← Каталог публичных статей
 ├── profile.html        ← Личный кабинет
@@ -77,7 +77,7 @@ CogneeAI/
 ├── storage.js          ← localStorage + AI-кэш
 ├── styles.css          ← Тёмная/светлая тема, 3 режима
 ├── cogneeai.js         ← Универсальный SDK (embed)
-├── config.js           ← Ключи (в .gitignore)
+├── config.js           ← Публичные ключи
 └── model/
     └── cognee_ai.onnx  ← CogneeAI SimpleRNN модель
 ```
