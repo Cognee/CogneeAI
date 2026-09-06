@@ -1,0 +1,41 @@
+name: Cognee Keep-Alive v1.0
+
+on:
+  schedule:
+    # Каждые 3 дня в 06:00 UTC — запас в 4 дня до 7-дневного порога паузы Supabase
+    - cron: '0 6 */3 * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+
+      - name: Пинг Supabase (регистрирует активность БД)
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/articles?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}")
+          echo "Код ответа Supabase: $HTTP_CODE"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::warning::Пинг Supabase вернул ошибку $HTTP_CODE — проверь секреты или доступность проекта"
+          fi
+
+      - name: Обновить файл heartbeat
+        run: |
+          mkdir -p .keepalive
+          echo "{\"last_ping\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"version\": \"v1.0\"}" > .keepalive/heartbeat.json
+
+      - name: Закоммитить heartbeat (не даёт GitHub отключить cron через 60 дней)
+        run: |
+          git config user.name "cognee-keepalive-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .keepalive/heartbeat.json
+          git diff --staged --quiet || git commit -m "chore: heartbeat v1.0 [skip ci]"
+          git push
