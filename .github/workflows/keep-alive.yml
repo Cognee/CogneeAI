@@ -3,7 +3,7 @@ name: Cognee Keep-Alive v1.0
 on:
   schedule:
     # Каждые 3 дня в 06:00 UTC — запас в 4 дня до 7-дневного порога паузы Supabase
-    - cron: '0 6 */3 * *'
+    - cron: '17 6 */3 * *'
   workflow_dispatch: {}
 
 permissions:
